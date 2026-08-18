@@ -69,6 +69,15 @@ def _clean_schema(_test_database):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    from app.core import ratelimit
+
+    ratelimit._in_memory_store.clear()
+    yield
+    ratelimit._in_memory_store.clear()
+
+
 @pytest.fixture
 async def client():
     transport = ASGITransport(app=app)

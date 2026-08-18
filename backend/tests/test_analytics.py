@@ -139,7 +139,11 @@ async def test_dashboard_widgets_present(client, org_a):
                 json={"customer_id": customer["id"], "items": [{"product_id": product["id"], "quantity": 1}]},
             )
         ).json()
-        await client.patch(f"/api/v1/orders/{order['id']}", headers=h, json={"status": "delivered"})
+        for status in ("confirmed", "processing", "shipped", "delivered"):
+            resp = await client.patch(
+                f"/api/v1/orders/{order['id']}", headers=h, json={"status": status}
+            )
+            assert resp.status_code == 200, resp.text
 
     body = (await client.get("/api/v1/analytics/dashboard?range=today", headers=h)).json()
 

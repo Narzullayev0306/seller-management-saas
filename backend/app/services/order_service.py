@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.exceptions import ApiError, bad_request, not_found
+from app.core.exceptions import ApiError, not_found
 from app.models.customer import Customer
 from app.models.inventory import InventoryMovement
 from app.models.order import Order, OrderItem
@@ -21,8 +21,7 @@ from app.services.notification_service import (
     notify_new_order,
     notify_order_cancelled,
 )
-
-FINAL_STATUSES = ("delivered", "cancelled")
+from app.services.order_state_machine import OrderStateMachine
 
 
 class OrderService:
@@ -143,11 +142,8 @@ class OrderService:
             raise ApiError(403, "PERMISSION_DENIED", "You can only update your own orders")
         if order.status == new_status:
             return order
-        if order.status in FINAL_STATUSES:
-            raise bad_request(
-                "ORDER_FINALIZED",
-                f"Cannot change an order that is already {order.status}",
-            )
+        old_status = order.status
+        OrderStateMachine.assert_transition(old_status, new_status)
 
         if new_status == "delivered":
             self._finalize_delivery(organization_id, order)
@@ -162,7 +158,7 @@ class OrderService:
             action="order.status_changed",
             entity_type="order",
             entity_id=order.id,
-            meta={"from": None, "to": new_status},
+            meta={"from": old_status, "to": new_status},
         )
         self.db.commit()
         if new_status == "cancelled":
@@ -176,11 +172,8 @@ class OrderService:
         self, organization_id: UUID, order_id: UUID, actor_user_id: UUID
     ) -> None:
         order = self._get_order(organization_id, order_id)
-        if order.status not in ("pending", "confirmed", "processing", "shipped"):
-            raise bad_request(
-                "ORDER_FINALIZED",
-                "Only non-final orders can be cancelled",
-            )
+        old_status = order.status
+        OrderStateMachine.assert_transition(old_status, "cancelled")
         self._cancel_order(organization_id, order)
         order.status = "cancelled"
         log_action(
@@ -190,6 +183,7 @@ class OrderService:
             action="order.cancelled",
             entity_type="order",
             entity_id=order.id,
+            meta={"from": old_status, "to": "cancelled"},
         )
         self.db.commit()
         notify_order_cancelled(
@@ -246,8 +240,10 @@ class OrderService:
         )
 
     def _cancel_order(self, organization_id: UUID, order: Order) -> None:
+        product_ids = [item.product_id for item in order.items]
+        products = self._get_products(organization_id, product_ids, for_update=True)
         for item in order.items:
-            product = self.db.get(Product, item.product_id)
+            product = products.get(item.product_id)
             if product is not None:
                 product.stock_quantity += item.quantity
                 self.db.add(

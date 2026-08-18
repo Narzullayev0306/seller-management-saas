@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ApiError, not_found
@@ -21,8 +22,15 @@ class InventoryService:
         payload: AdjustmentCreate,
         actor_user_id: UUID,
     ) -> Product:
-        product = self.db.get(Product, payload.product_id)
-        if product is None or product.organization_id != organization_id:
+        product = self.db.execute(
+            select(Product)
+            .where(
+                Product.organization_id == organization_id,
+                Product.id == payload.product_id,
+            )
+            .with_for_update()
+        ).scalar_one_or_none()
+        if product is None:
             raise not_found("Product")
 
         delta = payload.quantity if payload.type in ("purchase", "return") else -payload.quantity

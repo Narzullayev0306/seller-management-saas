@@ -152,6 +152,18 @@ async def test_delivery_finalizes_sale_and_updates_counters(client, org_a):
     ).json()
 
     resp = await client.patch(
+        f"/api/v1/orders/{order['id']}", headers=h, json={"status": "confirmed"}
+    )
+    assert resp.status_code == 200
+    resp = await client.patch(
+        f"/api/v1/orders/{order['id']}", headers=h, json={"status": "processing"}
+    )
+    assert resp.status_code == 200
+    resp = await client.patch(
+        f"/api/v1/orders/{order['id']}", headers=h, json={"status": "shipped"}
+    )
+    assert resp.status_code == 200
+    resp = await client.patch(
         f"/api/v1/orders/{order['id']}", headers=h, json={"status": "delivered"}
     )
     assert resp.status_code == 200
@@ -206,11 +218,15 @@ async def test_delivered_order_cannot_be_cancelled(client, org_a):
             json={"customer_id": customer["id"], "items": [{"product_id": product["id"], "quantity": 1}]},
         )
     ).json()
-    await client.patch(f"/api/v1/orders/{order['id']}", headers=h, json={"status": "delivered"})
+    for status in ("confirmed", "processing", "shipped", "delivered"):
+        resp = await client.patch(
+            f"/api/v1/orders/{order['id']}", headers=h, json={"status": status}
+        )
+        assert resp.status_code == 200, resp.text
 
     resp = await client.patch(f"/api/v1/orders/{order['id']}", headers=h, json={"status": "cancelled"})
     assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "ORDER_FINALIZED"
+    assert resp.json()["error"]["code"] == "INVALID_STATUS_TRANSITION"
 
 
 @pytest.mark.asyncio
@@ -226,7 +242,7 @@ async def test_cancelled_order_cannot_change(client, org_a):
     await client.patch(f"/api/v1/orders/{order['id']}", headers=h, json={"status": "cancelled"})
     resp = await client.patch(f"/api/v1/orders/{order['id']}", headers=h, json={"status": "delivered"})
     assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "ORDER_FINALIZED"
+    assert resp.json()["error"]["code"] == "INVALID_STATUS_TRANSITION"
 
 
 @pytest.mark.asyncio
@@ -291,5 +307,8 @@ async def test_seller_role_can_deliver_own_order(client, org_a):
     ).json()
     assert order["seller_id"] == seller["id"]
 
-    resp = await client.patch(f"/api/v1/orders/{order['id']}", headers=sh, json={"status": "delivered"})
-    assert resp.status_code == 200
+    for status in ("confirmed", "processing", "shipped", "delivered"):
+        resp = await client.patch(
+            f"/api/v1/orders/{order['id']}", headers=sh, json={"status": status}
+        )
+        assert resp.status_code == 200, resp.text

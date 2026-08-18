@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.models.audit_log import AuditLog
 from app.models.auth_token import AuthToken
 from app.models.customer import Customer
+from app.models.idempotency import IdempotencyKey
 from app.models.inventory import InventoryMovement
 from app.models.notification import Notification
 from app.models.order import Order, OrderItem
@@ -28,6 +29,7 @@ __all__ = [
     "BackInStockRequest",
     "Brand",
     "Customer",
+    "IdempotencyKey",
     "InventoryMovement",
     "Notification",
     "Order",

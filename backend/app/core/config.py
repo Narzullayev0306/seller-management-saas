@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     frontend_url: str = "http://localhost:3000"
 
+    trusted_proxies: list[str] = []
+
     redis_url: str = ""
     redis_enabled: bool = False
 

@@ -12,7 +12,7 @@ from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember
-from app.models.role import Role
+from app.models.role import Role, user_roles
 from app.models.user import User
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -26,9 +26,7 @@ def get_current_user(
         raise unauthorized()
     payload = decode_access_token(credentials.credentials)
     user = db.execute(
-        select(User)
-        .options(selectinload(User.roles).selectinload(Role.permissions))
-        .where(User.id == payload["sub"])
+        select(User).where(User.id == payload["sub"])
     ).scalar_one_or_none()
     if user is None or not user.is_active:
         raise unauthorized("INVALID_TOKEN", "Invalid access token")
@@ -55,12 +53,31 @@ def get_current_user(
     if org is None or not org.is_active:
         raise unauthorized("ORG_INACTIVE", "This company is no longer active")
 
+    # Scope roles (and their permissions) to the effective organization only:
+    # a user switching orgs must never inherit roles from another organization.
+    # NOTE: stored on a separate attribute (not user.roles) so the ORM never
+    # rewrites the user_roles association table on flush.
+    roles = db.execute(
+        select(Role)
+        .join(user_roles, user_roles.c.role_id == Role.id)
+        .options(selectinload(Role.permissions))
+        .where(
+            user_roles.c.user_id == user.id,
+            Role.organization_id == effective_org,
+        )
+    ).scalars().all()
+    user.effective_roles = list(roles)
     user.effective_organization_id = effective_org
     return user
 
 
+def _scoped_roles(user: User) -> list[Role]:
+    roles = getattr(user, "effective_roles", None)
+    return roles if roles is not None else list(user.roles)
+
+
 def require_owner(user: User = Depends(get_current_user)) -> User:
-    if "owner" not in {r.code for r in user.roles}:
+    if "owner" not in {r.code for r in _scoped_roles(user)}:
         raise forbidden("OWNER_ONLY", "Only the company owner can perform this action")
     return user
 
@@ -68,7 +85,7 @@ def require_owner(user: User = Depends(get_current_user)) -> User:
 def require_permissions(*required: str):
     def dependency(user: User = Depends(get_current_user)) -> User:
         granted = {
-            p.code for role in user.roles for p in role.permissions
+            p.code for role in _scoped_roles(user) for p in role.permissions
         }
         missing = set(required) - granted
         if missing:

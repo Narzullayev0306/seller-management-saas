@@ -5,6 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request, not_found
@@ -36,10 +37,32 @@ from app.schemas.storefront import (
 from app.services.order_service import OrderService
 
 
-def storefront_organization_id(db: Session) -> UUID:
-    """The public storefront serves the first (demo) organization."""
+def resolve_storefront(db: Session, slug: str | None = None) -> UUID:
+    """Resolve the public storefront for an organization by its slug.
+
+    When no slug is given (legacy URLs) the first enabled storefront is used.
+    Unknown or disabled storefronts return 404.
+    """
+    if slug is not None:
+        org_id = db.execute(
+            select(Organization.id).where(
+                Organization.slug == slug,
+                Organization.is_active.is_(True),
+                Organization.storefront_enabled.is_(True),
+            )
+        ).scalar_one_or_none()
+        if org_id is None:
+            raise not_found("Storefront")
+        return org_id
+
     org_id = db.execute(
-        select(Organization.id).order_by(Organization.created_at).limit(1)
+        select(Organization.id)
+        .where(
+            Organization.is_active.is_(True),
+            Organization.storefront_enabled.is_(True),
+        )
+        .order_by(Organization.created_at)
+        .limit(1)
     ).scalar_one_or_none()
     if org_id is None:
         raise bad_request("NO_ORGANIZATION", "No organization available for the storefront")
@@ -47,8 +70,9 @@ def storefront_organization_id(db: Session) -> UUID:
 
 
 class StorefrontService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, organization_id: UUID) -> None:
         self.db = db
+        self.organization_id = organization_id
 
     # ---- catalog ---------------------------------------------------------
 
@@ -63,7 +87,7 @@ class StorefrontService:
         featured: bool | None = None,
         sort_by: str | None = None,
     ) -> tuple[list[CatalogProduct], int, list[str], list[str]]:
-        org_id = storefront_organization_id(self.db)
+        org_id = self.organization_id
 
         rating_subq = (
             select(
@@ -159,7 +183,7 @@ class StorefrontService:
     # ---- detail ----------------------------------------------------------
 
     def product_detail(self, product_id: UUID) -> ProductDetail:
-        org_id = storefront_organization_id(self.db)
+        org_id = self.organization_id
         row = self.db.execute(
             select(Product, Brand)
             .outerjoin(Brand, Brand.id == Product.brand_id)
@@ -235,7 +259,7 @@ class StorefrontService:
     # ---- brands / categories --------------------------------------------
 
     def brands(self) -> list[BrandWithCount]:
-        org_id = storefront_organization_id(self.db)
+        org_id = self.organization_id
         rows = self.db.execute(
             select(
                 Brand,
@@ -261,7 +285,7 @@ class StorefrontService:
         ]
 
     def categories(self) -> list[CategoryWithCount]:
-        org_id = storefront_organization_id(self.db)
+        org_id = self.organization_id
         rows = self.db.execute(
             select(Product.category, func.count(Product.id))
             .where(Product.organization_id == org_id, Product.status == "active")
@@ -276,7 +300,7 @@ class StorefrontService:
     # ---- reviews / back-in-stock -----------------------------------------
 
     def add_review(self, product_id: UUID, payload: ReviewCreate) -> ReviewRead:
-        org_id = storefront_organization_id(self.db)
+        org_id = self.organization_id
         self._get_active_product(org_id, product_id)
         review = Review(
             organization_id=org_id,
@@ -290,7 +314,7 @@ class StorefrontService:
         return ReviewRead.model_validate(review)
 
     def request_back_in_stock(self, product_id: UUID, payload: BackInStockCreate) -> None:
-        org_id = storefront_organization_id(self.db)
+        org_id = self.organization_id
         self._get_active_product(org_id, product_id)
         existing = self.db.execute(
             select(BackInStockRequest).where(
@@ -313,24 +337,10 @@ class StorefrontService:
     # ---- checkout ---------------------------------------------------------
 
     def checkout(self, payload: CheckoutCreate) -> CheckoutResult:
-        org_id = storefront_organization_id(self.db)
-        customer = self.db.execute(
-            select(Customer).where(
-                Customer.organization_id == org_id,
-                func.lower(Customer.email) == payload.email.lower(),
-            )
-        ).scalar_one_or_none()
+        org_id = self.organization_id
+        customer = self._find_customer(org_id, payload.email)
         if customer is None:
-            customer = Customer(
-                organization_id=org_id,
-                first_name=payload.first_name,
-                last_name=payload.last_name,
-                email=payload.email,
-                phone=payload.phone,
-                address=payload.address,
-            )
-            self.db.add(customer)
-            self.db.flush()
+            customer = self._create_customer(org_id, payload)
 
         order_create = OrderCreate(
             seller_id=None,
@@ -355,6 +365,36 @@ class StorefrontService:
         )
 
     # ---- helpers ----------------------------------------------------------
+
+    def _find_customer(self, org_id: UUID, email: str) -> Customer | None:
+        return self.db.execute(
+            select(Customer).where(
+                Customer.organization_id == org_id,
+                func.lower(Customer.email) == email.lower(),
+            )
+        ).scalar_one_or_none()
+
+    def _create_customer(self, org_id: UUID, payload: CheckoutCreate) -> Customer:
+        """Insert a customer; on a concurrent-duplicate unique violation,
+        roll back to a savepoint and re-fetch the winner instead of failing."""
+        customer = Customer(
+            organization_id=org_id,
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            email=payload.email,
+            phone=payload.phone,
+            address=payload.address,
+        )
+        self.db.add(customer)
+        try:
+            with self.db.begin_nested():
+                self.db.flush()
+        except IntegrityError:
+            existing = self._find_customer(org_id, payload.email)
+            if existing is not None:
+                return existing
+            raise
+        return customer
 
     def _get_active_product(self, org_id: UUID, product_id: UUID) -> Product:
         product = self.db.execute(

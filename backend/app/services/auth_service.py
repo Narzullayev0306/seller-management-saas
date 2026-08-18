@@ -193,6 +193,9 @@ def current_user_payload(db: Session, user: User) -> dict:
     effective_org_id = (
         getattr(user, "effective_organization_id", None) or user.organization_id
     )
+    roles = getattr(user, "effective_roles", None)
+    if roles is None:
+        roles = list(user.roles)
     org = db.get(Organization, effective_org_id)
     return {
         "id": str(user.id),
@@ -203,7 +206,7 @@ def current_user_payload(db: Session, user: User) -> dict:
         "email_verified": user.email_verified,
         "status": user.status,
         "roles": [
-            {"code": r.code, "name": r.name} for r in user.roles
+            {"code": r.code, "name": r.name} for r in roles
         ],
         "permissions": user_permissions(db, user),
     }

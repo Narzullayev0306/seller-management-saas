@@ -64,13 +64,33 @@ async def test_multi_org_scoping(client, org_a, org_b):
 
     switch = await client.post(
         "/api/v1/auth/switch-org", headers=dual_h, json={"organization_id": org_b_info["id"]}
-    )
+)
     assert switch.status_code == 200
     switched_h = await _headers(switch.json()["access_token"])
 
     me = (await client.get("/api/v1/auth/me", headers=switched_h)).json()
     assert me["organization_id"] == org_b_info["id"]
     assert me["organization_name"] == org_b_info["name"]
+
+    denied = await client.post(
+        "/api/v1/products",
+        headers=switched_h,
+        json={"name": "B-Only Item", "sku": "B-1", "category": "T", "price": 10, "cost_price": 5, "stock_quantity": 3},
+    )
+    assert denied.status_code == 403
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO user_roles (id, user_id, role_id)
+                SELECT gen_random_uuid(), :user_id, r.id
+                FROM roles r
+                WHERE r.organization_id = :org_b AND r.code = 'admin'
+                """
+            ),
+            {"org_b": org_b_info["id"], "user_id": member["id"]},
+        )
 
     created = await client.post(
         "/api/v1/products",

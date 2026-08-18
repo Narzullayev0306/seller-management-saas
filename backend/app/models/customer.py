@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -15,9 +15,6 @@ if TYPE_CHECKING:
 
 class Customer(TimestampMixin, Base):
     __tablename__ = "customers"
-    __table_args__ = (
-        UniqueConstraint("organization_id", "email", name="uq_customers_org_email"),
-    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     organization_id: Mapped[UUID] = mapped_column(
@@ -31,6 +28,16 @@ class Customer(TimestampMixin, Base):
     total_orders: Mapped[int] = mapped_column(default=0, nullable=False)
     total_spent: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), default=Decimal("0"), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "email", name="uq_customers_org_email"),
+        Index(
+            "uq_customers_org_email_lower",
+            "organization_id",
+            func.lower(email),
+            unique=True,
+        ),
     )
 
     orders: Mapped[list[Order]] = relationship(back_populates="customer")

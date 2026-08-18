@@ -129,6 +129,14 @@ class CheckoutResult(BaseModel):
     items_count: int
 
 
+class StorefrontInfo(BaseModel):
+    slug: str
+    name: str
+    currency: str = "USD"
+    timezone: str = "UTC"
+    logo_url: str | None = None
+
+
 class CatalogParams(PageParams):
     search: str | None = Field(default=None, max_length=100)
     category: str | None = Field(default=None, max_length=100)

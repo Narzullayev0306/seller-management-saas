@@ -128,9 +128,11 @@ async def test_seller_stats_endpoint(client, org_a):
         json={"seller_id": seller["id"], "customer_id": customer["id"], "items": [{"product_id": product["id"], "quantity": 2}]},
     )
     assert order.status_code == 201
-    await client.patch(
-        f"/api/v1/orders/{order.json()['id']}", headers=h, json={"status": "delivered"}
-    )
+    for status in ("confirmed", "processing", "shipped", "delivered"):
+        resp = await client.patch(
+            f"/api/v1/orders/{order.json()['id']}", headers=h, json={"status": status}
+        )
+        assert resp.status_code == 200, resp.text
 
     stats = await client.get(f"/api/v1/sellers/{seller['id']}/stats", headers=h)
     assert stats.status_code == 200

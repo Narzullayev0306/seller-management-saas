@@ -45,7 +45,7 @@ def register(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> TokenPair:
-    check_rate_limit(request, "register", limit=30, window=60)
+    check_rate_limit(request, "register", limit=10, window=60)
     _, tokens = auth_service.register(db, payload, background_tasks)
     return tokens
 
@@ -60,7 +60,8 @@ def register(
     },
 )
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> TokenPair:
-    check_rate_limit(request, "login", limit=30, window=60)
+    check_rate_limit(request, "login", limit=10, window=60)
+    check_rate_limit(request, f"login_email:{payload.email.lower()}", limit=10, window=300)
     _, tokens = auth_service.login(db, payload.email, payload.password)
     return tokens
 

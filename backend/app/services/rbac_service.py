@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.organization import Organization
-from app.models.role import Permission, Role, role_permissions
+from app.models.role import Permission, Role
 from app.models.user import User
 from app.services.permissions import (
     PERMISSIONS,
@@ -91,12 +91,17 @@ def sync_system_role_permissions(db: Session) -> None:
     db.flush()
 
 
+def _roles_of(user: User) -> list[Role]:
+    roles = getattr(user, "effective_roles", None)
+    return roles if roles is not None else list(user.roles)
+
+
 def user_permissions(db: Session, user: User) -> list[str]:
     codes: set[str] = set()
-    for role in user.roles:
+    for role in _roles_of(user):
         codes.update(p.code for p in role.permissions)
     return sorted(codes)
 
 
 def user_role_codes(user: User) -> list[str]:
-    return [r.code for r in user.roles]
+    return [r.code for r in _roles_of(user)]

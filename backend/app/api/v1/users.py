@@ -28,6 +28,7 @@ from app.services.auth_service import (
 )
 from app.services.auth_service import get_user_by_id, invite_user, resend_invite
 from app.services.notification_service import notify_team_invited
+from app.services.rbac_service import user_role_codes
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -255,7 +256,7 @@ def update_user_roles(
     if target.id == actor.id and "owner" not in payload.role_codes:
         raise bad_request("CANNOT_REMOVE_OWN_OWNER", "You cannot remove your own owner role")
 
-    actor_is_owner = "owner" in [r.code for r in actor.roles]
+    actor_is_owner = "owner" in user_role_codes(actor)
     target_is_owner = "owner" in [r.code for r in target.roles]
     if (target_is_owner or "owner" in payload.role_codes) and not actor_is_owner:
         raise bad_request(

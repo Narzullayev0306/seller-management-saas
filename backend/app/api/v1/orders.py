@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,11 @@ from app.schemas.order import (
     OrderPaymentUpdate,
     OrderRead,
     OrderStatusUpdate,
+)
+from app.services.idempotency_service import (
+    claim_idempotency_key,
+    store_response,
+    wait_for_response,
 )
 from app.services.order_service import OrderService
 from app.services.rbac_service import user_role_codes
@@ -123,9 +129,10 @@ def list_orders(
 )
 def create_order(
     payload: OrderCreate,
+    request: Request,
     db: Session = Depends(get_db),
     actor: User = Depends(require_permissions("orders.create")),
-) -> OrderRead:
+) -> JSONResponse | OrderRead:
     seller = _linked_seller(db, actor)
     if "seller" in user_role_codes(actor):
         if seller is None:
@@ -143,9 +150,33 @@ def create_order(
         ).scalar_one_or_none()
         if not exists:
             raise ApiError(404, "SELLER_NOT_FOUND", "Seller not found")
-    order = OrderService(db).create_order(actor.effective_organization_id, payload, actor.id)
-    cache_invalidate("sf:catalog:*")
-    return _to_read(order)
+
+    def _run() -> OrderRead:
+        order = OrderService(db).create_order(
+            actor.effective_organization_id, payload, actor.id
+        )
+        cache_invalidate("sf:catalog:*")
+        return _to_read(order)
+
+    idem_key = request.headers.get("Idempotency-Key")
+    if idem_key:
+        org_id = actor.effective_organization_id
+        if not claim_idempotency_key(org_id, idem_key, user_id=actor.id):
+            stored = wait_for_response(org_id, idem_key)
+            if stored is not None:
+                status, body = stored
+                return JSONResponse(content=body, status_code=status)
+            raise ApiError(
+                409,
+                "IDEMPOTENCY_IN_PROGRESS",
+                "This request is still being processed, please retry shortly",
+            )
+        result = _run()
+        body = result.model_dump(mode="json")
+        store_response(org_id, idem_key, 201, body)
+        return JSONResponse(content=body, status_code=201)
+
+    return _run()
 
 
 @router.get("/{order_id}", response_model=OrderRead, summary="Get an order")

@@ -25,6 +25,9 @@ class Organization(Base):
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     plan: Mapped[str] = mapped_column(String(20), default="free", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    storefront_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     currency: Mapped[str] = mapped_column(String(10), default="USD", nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), default="UTC", nullable=False)

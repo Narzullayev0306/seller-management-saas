@@ -106,12 +106,13 @@ async def test_seller_analytics_scoped_to_own_orders(client, org_a):
         json={"customer_id": cust_id, "items": [{"product_id": product_id, "quantity": 1}]},
     )
     assert mine.status_code == 201
-    delivered = await client.patch(
-        f"/api/v1/orders/{mine.json()['id']}",
-        headers=seller_headers,
-        json={"status": "delivered"},
-    )
-    assert delivered.status_code == 200
+    for status in ("confirmed", "processing", "shipped", "delivered"):
+        delivered = await client.patch(
+            f"/api/v1/orders/{mine.json()['id']}",
+            headers=seller_headers,
+            json={"status": status},
+        )
+        assert delivered.status_code == 200, delivered.text
 
     dash = await client.get("/api/v1/analytics/dashboard", headers=seller_headers)
     assert dash.status_code == 200
