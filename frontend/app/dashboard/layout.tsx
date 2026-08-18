@@ -17,6 +17,8 @@ const NAV = [
   { href: "/dashboard/products", label: "Products", icon: "M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM6 8h12M6 12h12M6 16h8", permission: "products.read" },
   { href: "/dashboard/orders", label: "Orders", icon: "M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5", permission: "orders.read" },
   { href: "/dashboard/customers", label: "Customers", icon: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm14 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75", permission: "customers.read" },
+  { href: "/dashboard/reports", label: "Reports", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z", permission: "analytics.read" },
+  { href: "/dashboard/marketing", label: "Marketing", icon: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z", permission: "products.read" },
   { href: "/dashboard/sellers", label: "Sellers", icon: "M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z", permission: "sellers.read" },
   { href: "/dashboard/suppliers", label: "Suppliers", icon: "M17 8v3a4 4 0 0 1-8 0V8a2 2 0 1 1 4 0v3a6 6 0 0 1-12 0V8a2 2 0 1 1 4 0v3a2 2 0 1 0 4 0V8a4 4 0 1 0-8 0v3a8 8 0 0 0 16 0V8a4 4 0 1 0-8 0m-2 0v5", permission: "suppliers.read" },
   { href: "/dashboard/inventory", label: "Inventory", icon: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12", permission: "inventory.read" },

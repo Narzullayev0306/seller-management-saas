@@ -216,6 +216,22 @@ export function StorefrontShell({
                             {user.roles.map((r) => r.name).join(", ") || "Customer"}
                           </span>
                         </div>
+                        <div className="py-1 border-b border-slate-100 dark:border-slate-800">
+                          <Link
+                            href="/storefront/orders"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="block px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            📦 My Orders
+                          </Link>
+                          <Link
+                            href="/storefront/account/profile"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="block px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            👤 My Profile
+                          </Link>
+                        </div>
                         <button
                           type="button"
                           onClick={() => {
