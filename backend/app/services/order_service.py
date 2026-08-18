@@ -7,21 +7,19 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.exceptions import ApiError, not_found
+from app.core.exceptions import ApiError, bad_request, not_found
 from app.models.customer import Customer
 from app.models.inventory import InventoryMovement
 from app.models.order import Order, OrderItem
 from app.models.product import Product
+from app.models.product_variant import ProductVariant
 from app.models.sale import Sale
 from app.models.seller import Seller
 from app.schemas.order import OrderCreate
 from app.services.audit_service import log_action
-from app.services.notification_service import (
-    notify_low_stock,
-    notify_new_order,
-    notify_order_cancelled,
-)
+from app.services.coupon_service import apply_coupon
 from app.services.order_state_machine import OrderStateMachine
+from app.services.outbox_service import emit
 
 
 class OrderService:
@@ -46,6 +44,10 @@ class OrderService:
 
         product_ids = [i.product_id for i in payload.items]
         products = self._get_products(organization_id, product_ids, for_update=True)
+        variant_ids = [i.product_variant_id for i in payload.items if i.product_variant_id]
+        variants = self._get_variants(
+            organization_id, product_ids, variant_ids, for_update=True
+        ) if variant_ids else {}
 
         order = Order(
             organization_id=organization_id,
@@ -64,16 +66,38 @@ class OrderService:
         low_stock_products: list[UUID] = []
         for item in payload.items:
             product = products[item.product_id]
-            if product.stock_quantity < item.quantity:
-                raise ApiError(
-                    409,
-                    "INSUFFICIENT_STOCK",
-                    f"Product '{product.name}' has only {product.stock_quantity} in stock",
-                    {"product_id": str(product.id), "available": product.stock_quantity},
+            variant = variants.get(item.product_variant_id) if item.product_variant_id else None
+            if item.product_variant_id and variant is None:
+                raise bad_request(
+                    "VARIANT_NOT_FOUND",
+                    "Product variant does not belong to this product",
                 )
-            product.stock_quantity -= item.quantity
-            if product.stock_quantity <= product.low_stock_threshold:
-                low_stock_products.append(product.id)
+            if variant is not None:
+                if not variant.active:
+                    raise ApiError(
+                        409, "VARIANT_INACTIVE", f"Variant '{variant.name}' is inactive"
+                    )
+                if variant.stock_quantity < item.quantity:
+                    raise ApiError(
+                        409,
+                        "INSUFFICIENT_STOCK",
+                        f"Variant '{variant.name}' has only {variant.stock_quantity} in stock",
+                        {"product_id": str(product.id), "available": variant.stock_quantity},
+                    )
+                variant.stock_quantity -= item.quantity
+                unit_price = variant.price
+            else:
+                if product.stock_quantity < item.quantity:
+                    raise ApiError(
+                        409,
+                        "INSUFFICIENT_STOCK",
+                        f"Product '{product.name}' has only {product.stock_quantity} in stock",
+                        {"product_id": str(product.id), "available": product.stock_quantity},
+                    )
+                product.stock_quantity -= item.quantity
+                if product.stock_quantity <= product.low_stock_threshold:
+                    low_stock_products.append(product.id)
+                unit_price = product.price
             self.db.add(
                 InventoryMovement(
                     organization_id=organization_id,
@@ -84,14 +108,15 @@ class OrderService:
                     reference_id=order.id,
                 )
             )
-            line_total = product.price * item.quantity
+            line_total = unit_price * item.quantity
             subtotal += line_total
             items.append(
                 OrderItem(
                     order_id=order.id,
                     product_id=product.id,
+                    product_variant_id=variant.id if variant else None,
                     quantity=item.quantity,
-                    unit_price=product.price,
+                    unit_price=unit_price,
                     subtotal=line_total,
                 )
             )
@@ -101,12 +126,24 @@ class OrderService:
                 422, "VALIDATION_ERROR", "Discount cannot exceed subtotal"
             )
 
+        discount = payload.discount
+        if payload.coupon_code:
+            if discount > 0:
+                raise ApiError(
+                    422,
+                    "VALIDATION_ERROR",
+                    "Use either discount or coupon_code, not both",
+                )
+            discount = apply_coupon(
+                self.db, organization_id, order, customer.id, payload.coupon_code, subtotal
+            )
+
         order.items = items
         order.subtotal = subtotal
-        order.discount = payload.discount
+        order.discount = discount
         order.tax = payload.tax
         order.shipping_fee = payload.shipping_fee
-        order.total = subtotal - payload.discount + payload.tax + payload.shipping_fee
+        order.total = subtotal - discount + payload.tax + payload.shipping_fee
         self.db.flush()
 
         log_action(
@@ -118,11 +155,24 @@ class OrderService:
             entity_id=order.id,
             meta={"order_number": order.order_number, "total": str(order.total)},
         )
-        self.db.commit()
         for product_id in low_stock_products:
-            notify_low_stock(self.db, organization_id, product_id)
-        notify_new_order(
-            self.db, organization_id, order.order_number, order.id, actor_user_id
+            emit(
+                self.db,
+                organization_id=organization_id,
+                event_type="stock.low",
+                aggregate_type="product",
+                aggregate_id=product_id,
+            )
+        emit(
+            self.db,
+            organization_id=organization_id,
+            event_type="order.created",
+            aggregate_type="order",
+            aggregate_id=order.id,
+            payload={
+                "order_number": order.order_number,
+                "actor_user_id": str(actor_user_id) if actor_user_id else None,
+            },
         )
         self.db.commit()
         return self._reload(order.id)
@@ -160,12 +210,19 @@ class OrderService:
             entity_id=order.id,
             meta={"from": old_status, "to": new_status},
         )
-        self.db.commit()
         if new_status == "cancelled":
-            notify_order_cancelled(
-                self.db, organization_id, order.order_number, order.id, actor_user_id
+            emit(
+                self.db,
+                organization_id=organization_id,
+                event_type="order.cancelled",
+                aggregate_type="order",
+                aggregate_id=order.id,
+                payload={
+                    "order_number": order.order_number,
+                    "actor_user_id": str(actor_user_id) if actor_user_id else None,
+                },
             )
-            self.db.commit()
+        self.db.commit()
         return self._reload(order.id)
 
     def delete_order(
@@ -185,9 +242,16 @@ class OrderService:
             entity_id=order.id,
             meta={"from": old_status, "to": "cancelled"},
         )
-        self.db.commit()
-        notify_order_cancelled(
-            self.db, organization_id, order.order_number, order.id, actor_user_id
+        emit(
+            self.db,
+            organization_id=organization_id,
+            event_type="order.cancelled",
+            aggregate_type="order",
+            aggregate_id=order.id,
+            payload={
+                "order_number": order.order_number,
+                "actor_user_id": str(actor_user_id) if actor_user_id else None,
+            },
         )
         self.db.commit()
 
@@ -242,10 +306,24 @@ class OrderService:
     def _cancel_order(self, organization_id: UUID, order: Order) -> None:
         product_ids = [item.product_id for item in order.items]
         products = self._get_products(organization_id, product_ids, for_update=True)
+        variant_ids = [
+            item.product_variant_id for item in order.items if item.product_variant_id
+        ]
+        variants = (
+            self._get_variants(
+                organization_id, product_ids, variant_ids, for_update=True
+            )
+            if variant_ids
+            else {}
+        )
         for item in order.items:
             product = products.get(item.product_id)
-            if product is not None:
+            variant = variants.get(item.product_variant_id) if item.product_variant_id else None
+            if variant is not None:
+                variant.stock_quantity += item.quantity
+            elif product is not None:
                 product.stock_quantity += item.quantity
+            if product is not None:
                 self.db.add(
                     InventoryMovement(
                         organization_id=organization_id,
@@ -332,6 +410,23 @@ class OrderService:
         if missing:
             raise not_found("Product")
         return products
+
+    def _get_variants(
+        self,
+        organization_id: UUID,
+        product_ids: list[UUID],
+        variant_ids: list[UUID],
+        for_update: bool = False,
+    ) -> dict[UUID, ProductVariant]:
+        stmt = select(ProductVariant).where(
+            ProductVariant.organization_id == organization_id,
+            ProductVariant.id.in_(set(variant_ids)),
+            ProductVariant.product_id.in_(set(product_ids)),
+        )
+        if for_update:
+            stmt = stmt.with_for_update()
+        rows = self.db.execute(stmt).scalars()
+        return {v.id: v for v in rows}
 
     def _next_order_number(self) -> str:
         stamp = datetime.now(UTC).strftime("%Y%m%d")

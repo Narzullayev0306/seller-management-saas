@@ -10,6 +10,7 @@ from app.models.inventory import InventoryMovement
 from app.models.product import Product
 from app.schemas.inventory import AdjustmentCreate
 from app.services.audit_service import log_action
+from app.services.outbox_service import emit
 
 
 class InventoryService:
@@ -34,6 +35,7 @@ class InventoryService:
             raise not_found("Product")
 
         delta = payload.quantity if payload.type in ("purchase", "return") else -payload.quantity
+        old_stock = product.stock_quantity
         new_stock = product.stock_quantity + delta
         if new_stock < 0:
             raise ApiError(
@@ -45,6 +47,7 @@ class InventoryService:
             raise ApiError(422, "VALIDATION_ERROR", "Quantity must be non-zero")
 
         product.stock_quantity = new_stock
+        restocked = old_stock == 0 and new_stock > 0
         self.db.add(
             InventoryMovement(
                 organization_id=organization_id,
@@ -63,6 +66,23 @@ class InventoryService:
             entity_id=product.id,
             meta={"type": payload.type, "quantity": str(delta), "reason": payload.reason},
         )
+        self.db.commit()
+        if restocked:
+            emit(
+                self.db,
+                organization_id=organization_id,
+                event_type="inventory.restocked",
+                aggregate_type="product",
+                aggregate_id=product.id,
+            )
+        if product.stock_quantity <= product.low_stock_threshold:
+            emit(
+                self.db,
+                organization_id=organization_id,
+                event_type="stock.low",
+                aggregate_type="product",
+                aggregate_id=product.id,
+            )
         self.db.commit()
         self.db.refresh(product)
         return product

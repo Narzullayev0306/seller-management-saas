@@ -17,6 +17,15 @@ async def _headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _process_outbox() -> None:
+    """Deliver pending outbox events synchronously (worker is not running in tests)."""
+    from app.db.session import SessionLocal
+    from app.worker import process_pending
+
+    with SessionLocal() as db:
+        process_pending(db)
+
+
 def _install_token(email: str, purpose: str) -> str:
     """Insert a raw token directly (email delivery is simulated)."""
     raw = secrets.token_urlsafe(24)
@@ -123,6 +132,7 @@ async def test_verify_email_marks_user_verified(client, org_a):
 async def test_low_stock_notification_on_product_create(client, org_a):
     h = await _headers(org_a["access_token"])
     await _product(client, org_a["access_token"], stock_quantity=2)
+    _process_outbox()
 
     count = await client.get("/api/v1/notifications/unread-count", headers=h)
     assert count.status_code == 200
@@ -138,6 +148,7 @@ async def test_low_stock_notification_on_product_create(client, org_a):
 async def test_mark_notifications_read(client, org_a):
     h = await _headers(org_a["access_token"])
     await _product(client, org_a["access_token"], stock_quantity=1)
+    _process_outbox()
 
     listing = (await client.get("/api/v1/notifications", headers=h)).json()
     assert listing["total"] >= 1

@@ -7,6 +7,30 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.common import PageParams
 
 
+class ProductVariantInput(BaseModel):
+    sku: str = Field(min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=200)
+    attributes: dict[str, str] | None = None
+    price: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    cost_price: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    stock_quantity: int = Field(default=0, ge=0)
+    active: bool = True
+
+
+class ProductVariantRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sku: str
+    name: str
+    attributes: dict[str, str] | None = None
+    price: Decimal
+    cost_price: Decimal
+    stock_quantity: int
+    active: bool
+    created_at: datetime
+
+
 class ProductBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     sku: str = Field(min_length=1, max_length=50)
@@ -20,6 +44,7 @@ class ProductBase(BaseModel):
     image_url: str | None = Field(default=None, max_length=500)
     brand_id: UUID | None = None
     featured: bool = False
+    variants: list[ProductVariantInput] = Field(default_factory=list)
 
 
 class ProductCreate(ProductBase):
@@ -41,6 +66,7 @@ class ProductUpdate(BaseModel):
     image_url: str | None = Field(default=None, max_length=500)
     brand_id: UUID | None = None
     featured: bool | None = None
+    variants: list[ProductVariantInput] | None = None
 
 
 class ProductRead(BaseModel):
@@ -60,6 +86,7 @@ class ProductRead(BaseModel):
     image_url: str | None = None
     brand_id: UUID | None = None
     featured: bool = False
+    variants: list[ProductVariantRead] = Field(default_factory=list)
     created_at: datetime
 
 

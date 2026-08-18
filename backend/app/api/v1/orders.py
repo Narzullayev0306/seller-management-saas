@@ -10,6 +10,7 @@ from app.core.exceptions import ApiError, forbidden
 from app.core.redis import cache_invalidate
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
+from app.models.payment import Payment
 from app.models.seller import Seller
 from app.models.user import User
 from app.repositories.order_repo import OrderRepository
@@ -21,6 +22,7 @@ from app.schemas.order import (
     OrderPaymentUpdate,
     OrderRead,
     OrderStatusUpdate,
+    PaymentRead,
 )
 from app.services.idempotency_service import (
     claim_idempotency_key,
@@ -54,6 +56,7 @@ def _to_read(order) -> OrderRead:
             {
                 "id": item.id,
                 "product_id": item.product_id,
+                "product_variant_id": item.product_variant_id,
                 "product_name": item.product.name if item.product else "",
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
@@ -251,6 +254,47 @@ def update_order_payment(
         actor.effective_organization_id, order_id, payload.payment_status, actor.id
     )
     return _to_read(order)
+
+
+@router.get(
+    "/{order_id}/payments",
+    response_model=list[PaymentRead],
+    summary="Order payments",
+    description="Payments recorded against the order (checkout charges and "
+    "provider results).",
+)
+def order_payments(
+    order_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permissions("orders.read")),
+) -> list[PaymentRead]:
+    repo = OrderRepository(db)
+    order = repo.get_full(user.effective_organization_id, order_id)
+    seller = _linked_seller(db, user)
+    if "seller" in user_role_codes(user) and (seller is None or order.seller_id != seller.id):
+        raise forbidden("PERMISSION_DENIED", "You can only view your own orders")
+    rows = db.execute(
+        select(Payment)
+        .where(
+            Payment.organization_id == user.effective_organization_id,
+            Payment.order_id == order_id,
+        )
+        .order_by(Payment.created_at.desc())
+    ).scalars().all()
+    return [
+        PaymentRead(
+            id=p.id,
+            provider=p.provider,
+            provider_payment_id=p.provider_payment_id,
+            amount=p.amount,
+            currency=p.currency,
+            status=p.status,
+            failure_message=p.failure_message,
+            paid_at=p.paid_at,
+            created_at=p.created_at,
+        )
+        for p in rows
+    ]
 
 
 @router.get(

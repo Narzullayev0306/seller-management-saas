@@ -64,6 +64,18 @@ class ReviewRead(BaseModel):
     created_at: datetime
 
 
+class ProductVariantRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    sku: str
+    attributes: dict[str, str] | None = None
+    price: Decimal
+    stock_quantity: int
+    active: bool
+
+
 class ProductDetail(BaseModel):
     id: UUID
     name: str
@@ -78,6 +90,7 @@ class ProductDetail(BaseModel):
     images: list[ProductImageRead] = []
     reviews: list[ReviewRead] = []
     price_history: list[PricePoint] = []
+    variants: list[ProductVariantRead] = []
     rating: Decimal | None = None
     review_count: int = 0
 
@@ -107,6 +120,7 @@ class BackInStockCreate(BaseModel):
 
 class CheckoutItem(BaseModel):
     product_id: UUID
+    product_variant_id: UUID | None = None
     quantity: int = Field(ge=1, le=100)
 
 
@@ -118,6 +132,7 @@ class CheckoutCreate(BaseModel):
     address: str | None = Field(default=None, max_length=300)
     discount: Decimal = Field(default=Decimal("0"), ge=0)
     tax: Decimal = Field(default=Decimal("0"), ge=0)
+    coupon_code: str | None = Field(default=None, max_length=50)
     items: list[CheckoutItem] = Field(min_length=1)
 
 
@@ -125,7 +140,11 @@ class CheckoutResult(BaseModel):
     order_id: UUID
     order_number: str
     status: str
+    payment_status: str
+    payment_id: UUID
     total: Decimal
+    discount: Decimal = Decimal("0")
+    coupon_code: str | None = None
     items_count: int
 
 

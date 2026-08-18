@@ -33,6 +33,10 @@ PERMISSIONS: dict[str, str] = {
     "suppliers.create": "Create suppliers",
     "suppliers.update": "Update suppliers",
     "suppliers.delete": "Delete suppliers",
+    "coupons.read": "List and view coupons",
+    "coupons.create": "Create coupons",
+    "coupons.update": "Update coupons",
+    "coupons.delete": "Delete coupons",
     "settings.read": "View company settings",
     "settings.update": "Update company settings",
 }
@@ -62,6 +66,9 @@ SYSTEM_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "suppliers.read",
         "suppliers.create",
         "suppliers.update",
+        "coupons.read",
+        "coupons.create",
+        "coupons.update",
         "settings.read",
     ],
     "seller": [

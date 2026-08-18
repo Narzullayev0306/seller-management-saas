@@ -27,6 +27,7 @@ from app.models.storefront import (
 if TYPE_CHECKING:
     from app.models.inventory import InventoryMovement
     from app.models.order import OrderItem
+    from app.models.product_variant import ProductVariant
 
 
 class Product(TimestampMixin, Base):
@@ -74,6 +75,9 @@ class Product(TimestampMixin, Base):
         back_populates="product", cascade="all, delete-orphan"
     )
     back_in_stock_requests: Mapped[list[BackInStockRequest]] = relationship(
+        back_populates="product", cascade="all, delete-orphan"
+    )
+    variants: Mapped[list[ProductVariant]] = relationship(
         back_populates="product", cascade="all, delete-orphan"
     )
 

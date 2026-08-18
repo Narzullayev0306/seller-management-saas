@@ -20,11 +20,13 @@ PAYMENT_STATUSES = (
     "paid",
     "partially_paid",
     "refunded",
+    "failed",
 )
 
 
 class OrderItemInput(BaseModel):
     product_id: UUID
+    product_variant_id: UUID | None = None
     quantity: int = Field(ge=1, le=10000)
 
 
@@ -37,8 +39,9 @@ class OrderCreate(BaseModel):
         default=Decimal("0"), ge=0, max_digits=14, decimal_places=2
     )
     payment_status: str = Field(
-        default="pending", pattern="^(pending|paid|partially_paid|refunded)$"
+        default="pending", pattern="^(pending|paid|partially_paid|refunded|failed)$"
     )
+    coupon_code: str | None = Field(default=None, max_length=50)
     items: list[OrderItemInput] = Field(min_length=1, max_length=100)
 
 
@@ -47,7 +50,21 @@ class OrderStatusUpdate(BaseModel):
 
 
 class OrderPaymentUpdate(BaseModel):
-    payment_status: str = Field(pattern="^(pending|paid|partially_paid|refunded)$")
+    payment_status: str = Field(pattern="^(pending|paid|partially_paid|refunded|failed)$")
+
+
+class PaymentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    provider: str
+    provider_payment_id: str | None = None
+    amount: Decimal
+    currency: str
+    status: str
+    failure_message: str | None = None
+    paid_at: datetime | None = None
+    created_at: datetime
 
 
 class OrderItemRead(BaseModel):
@@ -55,6 +72,7 @@ class OrderItemRead(BaseModel):
 
     id: UUID
     product_id: UUID
+    product_variant_id: UUID | None = None
     product_name: str = ""
     quantity: int
     unit_price: Decimal

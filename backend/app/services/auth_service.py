@@ -203,6 +203,7 @@ def current_user_payload(db: Session, user: User) -> dict:
         "full_name": user.full_name,
         "organization_id": str(effective_org_id),
         "organization_name": org.name if org else user.organization.name,
+        "organization_slug": org.slug if org else None,
         "email_verified": user.email_verified,
         "status": user.status,
         "roles": [

@@ -11,6 +11,7 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
+    from app.models.payment import Payment
     from app.models.product import Product
     from app.models.sale import Sale
     from app.models.seller import Seller
@@ -62,6 +63,7 @@ class Order(TimestampMixin, Base):
     sale: Mapped[Sale | None] = relationship(
         back_populates="order", uselist=False, cascade="all, delete-orphan"
     )
+    payments: Mapped[list[Payment]] = relationship(back_populates="order")
 
 
 class OrderItem(Base):
@@ -76,6 +78,11 @@ class OrderItem(Base):
     )
     product_id: Mapped[UUID] = mapped_column(
         ForeignKey("products.id", ondelete="RESTRICT"), nullable=False
+    )
+    product_variant_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("product_variants.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
     )
     quantity: Mapped[int] = mapped_column(nullable=False)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)

@@ -10,6 +10,7 @@ from app.core.redis import cache_invalidate
 from app.db.session import get_db
 from app.models.inventory import InventoryMovement
 from app.models.product import Product
+from app.models.product_variant import ProductVariant
 from app.models.storefront import Brand, PriceHistory
 from app.models.user import User
 from app.repositories.product_repo import ProductRepository
@@ -19,9 +20,11 @@ from app.schemas.product import (
     ProductListParams,
     ProductRead,
     ProductUpdate,
+    ProductVariantInput,
+    ProductVariantRead,
 )
 from app.services.audit_service import log_action
-from app.services.notification_service import notify_low_stock
+from app.services.outbox_service import emit
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -54,8 +57,90 @@ def _to_read(product: Product) -> ProductRead:
         image_url=product.image_url,
         brand_id=product.brand_id,
         featured=product.featured,
+        variants=[
+            ProductVariantRead(
+                id=v.id,
+                sku=v.sku,
+                name=v.name,
+                attributes=v.attributes,
+                price=v.price,
+                cost_price=v.cost_price,
+                stock_quantity=v.stock_quantity,
+                active=v.active,
+                created_at=v.created_at,
+            )
+            for v in product.variants
+        ],
         created_at=product.created_at,
     )
+
+
+def _ensure_variant_skus(
+    db: Session, organization_id: UUID, variants: list[ProductVariantInput], exclude_product_id: UUID | None = None
+) -> None:
+    if not variants:
+        return
+    seen: set[str] = set()
+    for v in variants:
+        if v.sku in seen:
+            raise bad_request("VARIANT_SKU_DUPLICATE", f"Duplicate variant SKU: {v.sku}")
+        seen.add(v.sku)
+    stmt = select(ProductVariant.id).where(
+        ProductVariant.organization_id == organization_id,
+        ProductVariant.sku.in_(seen),
+    )
+    if exclude_product_id is not None:
+        stmt = stmt.where(ProductVariant.product_id != exclude_product_id)
+    existing = db.execute(stmt).scalars().all()
+    if existing:
+        raise bad_request("VARIANT_SKU_TAKEN", "A variant with this SKU already exists")
+
+
+def _sync_variants(
+    db: Session,
+    organization_id: UUID,
+    product: Product,
+    variants: list[ProductVariantInput],
+) -> None:
+    incoming = {v.sku: v for v in variants}
+    existing = {v.sku: v for v in product.variants}
+    for sku, v in incoming.items():
+        if sku in existing:
+            old = existing[sku]
+            old.name = v.name
+            old.attributes = v.attributes
+            old.price = v.price
+            old.cost_price = v.cost_price
+            old.active = v.active
+            if v.stock_quantity != old.stock_quantity:
+                delta = v.stock_quantity - old.stock_quantity
+                old.stock_quantity = v.stock_quantity
+                db.add(
+                    InventoryMovement(
+                        organization_id=organization_id,
+                        product_id=product.id,
+                        type="adjustment",
+                        quantity=delta,
+                        reason="variant stock edit",
+                    )
+                )
+        else:
+            db.add(
+                ProductVariant(
+                    organization_id=organization_id,
+                    product_id=product.id,
+                    sku=v.sku,
+                    name=v.name,
+                    attributes=v.attributes,
+                    price=v.price,
+                    cost_price=v.cost_price,
+                    stock_quantity=v.stock_quantity,
+                    active=v.active,
+                )
+            )
+    for sku, old in existing.items():
+        if sku not in incoming:
+            db.delete(old)
 
 
 @router.get(
@@ -115,6 +200,7 @@ def create_product(
     if existing:
         raise bad_request("SKU_TAKEN", "A product with this SKU already exists")
     _ensure_brand(db, actor.effective_organization_id, payload.brand_id)
+    _ensure_variant_skus(db, actor.effective_organization_id, payload.variants)
 
     product = repo.create(
         actor.effective_organization_id,
@@ -138,6 +224,7 @@ def create_product(
                 reason="initial stock",
             )
         )
+    _sync_variants(db, actor.effective_organization_id, product, payload.variants)
     log_action(
         db, organization_id=actor.effective_organization_id, user_id=actor.id,
         action="product.created", entity_type="product", entity_id=product.id,
@@ -145,7 +232,13 @@ def create_product(
     )
     db.commit()
     if product.stock_quantity <= product.low_stock_threshold:
-        notify_low_stock(db, actor.effective_organization_id, product.id)
+        emit(
+            db,
+            organization_id=actor.effective_organization_id,
+            event_type="stock.low",
+            aggregate_type="product",
+            aggregate_id=product.id,
+        )
         db.commit()
     cache_invalidate("sf:catalog:*")
     return _to_read(product)
@@ -170,7 +263,8 @@ def update_product(
 ) -> ProductRead:
     repo = ProductRepository(db)
     product = repo.get(actor.effective_organization_id, product_id)
-    data = payload.model_dump(exclude_none=True)
+    variant_payload = payload.variants
+    data = payload.model_dump(exclude_none=True, exclude={"variants"})
     if "brand_id" in data:
         _ensure_brand(db, actor.effective_organization_id, data["brand_id"])
 
@@ -186,11 +280,18 @@ def update_product(
             raise bad_request("SKU_TAKEN", "A product with this SKU already exists")
 
     stock_delta = data.pop("stock_quantity", None)
+    if variant_payload is not None:
+        _ensure_variant_skus(
+            db, actor.effective_organization_id, variant_payload, exclude_product_id=product.id
+        )
+    restocked = False
     if stock_delta is not None and stock_delta != product.stock_quantity:
+        old_stock = product.stock_quantity
         diff = stock_delta - product.stock_quantity
         if product.stock_quantity + diff < 0:
             raise bad_request("INSUFFICIENT_STOCK", "Stock cannot go below zero")
         product.stock_quantity += diff
+        restocked = old_stock == 0 and product.stock_quantity > 0
         db.add(
             InventoryMovement(
                 organization_id=actor.effective_organization_id,
@@ -204,6 +305,8 @@ def update_product(
     price_old = product.price if "price" in data else None
     for field, value in data.items():
         setattr(product, field, value)
+    if variant_payload is not None:
+        _sync_variants(db, actor.effective_organization_id, product, variant_payload)
     if price_old is not None and product.price != price_old:
         db.add(
             PriceHistory(
@@ -219,8 +322,23 @@ def update_product(
         meta=data,
     )
     db.commit()
+    if restocked:
+        emit(
+            db,
+            organization_id=actor.effective_organization_id,
+            event_type="inventory.restocked",
+            aggregate_type="product",
+            aggregate_id=product.id,
+        )
+        db.commit()
     if product.stock_quantity <= product.low_stock_threshold:
-        notify_low_stock(db, actor.effective_organization_id, product.id)
+        emit(
+            db,
+            organization_id=actor.effective_organization_id,
+            event_type="stock.low",
+            aggregate_type="product",
+            aggregate_id=product.id,
+        )
         db.commit()
     cache_invalidate("sf:catalog:*")
     return _to_read(repo.get(actor.effective_organization_id, product_id))

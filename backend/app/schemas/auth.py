@@ -62,6 +62,7 @@ class MeResponse(BaseModel):
     full_name: str
     organization_id: str
     organization_name: str
+    organization_slug: str | None = None
     email_verified: bool = False
     status: str = "active"
     roles: list[RoleBrief]

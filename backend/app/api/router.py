@@ -4,6 +4,7 @@ from app.api.v1 import (
     analytics,
     audit_logs,
     auth,
+    coupons,
     customers,
     inventory,
     notifications,
@@ -35,3 +36,4 @@ api_router.include_router(uploads.router)
 api_router.include_router(notifications.router)
 api_router.include_router(organizations.router)
 api_router.include_router(suppliers.router)
+api_router.include_router(coupons.router)

@@ -31,10 +31,12 @@ from app.schemas.storefront import (
     PricePoint,
     ProductDetail,
     ProductImageRead,
+    ProductVariantRead,
     ReviewCreate,
     ReviewRead,
 )
 from app.services.order_service import OrderService
+from app.services.payment_service import process_order_payment
 
 
 def resolve_storefront(db: Session, slug: str | None = None) -> UUID:
@@ -252,6 +254,19 @@ class StorefrontService:
                 PricePoint(old_price=h.old_price, new_price=h.new_price, changed_at=h.changed_at)
                 for h in history
             ],
+            variants=[
+                ProductVariantRead(
+                    id=v.id,
+                    name=v.name,
+                    sku=v.sku,
+                    attributes=v.attributes,
+                    price=v.price,
+                    stock_quantity=v.stock_quantity,
+                    active=v.active,
+                )
+                for v in product.variants
+                if v.active
+            ],
             rating=_quantize(rating),
             review_count=int(review_count),
         )
@@ -347,21 +362,32 @@ class StorefrontService:
             customer_id=customer.id,
             discount=payload.discount,
             tax=payload.tax,
+            coupon_code=payload.coupon_code,
             items=[
-                OrderItemInput(product_id=i.product_id, quantity=i.quantity)
+                OrderItemInput(
+                    product_id=i.product_id,
+                    product_variant_id=i.product_variant_id,
+                    quantity=i.quantity,
+                )
                 for i in payload.items
             ],
         )
         order = OrderService(self.db).create_order(
             org_id, order_create, actor_user_id=None
         )
+        payment = process_order_payment(self.db, org_id, order)
+        self.db.commit()
         items_count = sum(i.quantity for i in payload.items)
         return CheckoutResult(
             order_id=order.id,
             order_number=order.order_number,
             status=order.status,
+            payment_status=order.payment_status,
             total=order.total,
+            discount=order.discount,
+            coupon_code=payload.coupon_code,
             items_count=items_count,
+            payment_id=payment.id,
         )
 
     # ---- helpers ----------------------------------------------------------
