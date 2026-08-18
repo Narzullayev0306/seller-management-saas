@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { useStorefront } from "@/lib/storefront-context";
 import { api } from "@/lib/api-client";
+import { sfPath } from "@/lib/storefront-slug";
 import { formatMoney } from "@/lib/format";
 import type { StorefrontProduct, StorefrontProductDetail } from "@/lib/types";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -40,14 +41,18 @@ export default function ProductDetailPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const data = await api.get<StorefrontProductDetail>(`/storefront/products/${productId}`);
+        const [detailPath, catalogPath] = await Promise.all([
+          sfPath(`/products/${productId}`),
+          sfPath("/catalog"),
+        ]);
+        const data = await api.get<StorefrontProductDetail>(detailPath);
         setProduct(data);
         setSelectedImage(data?.image_url || (data?.images?.[0]?.url ?? null));
 
         // Load related products from catalog
         if (data?.category) {
           const catalogRes = await api.get<{ items: StorefrontProduct[] }>(
-            `/storefront/catalog?category=${encodeURIComponent(data.category)}&page_size=4`
+            `${catalogPath}?category=${encodeURIComponent(data.category)}&page_size=4`,
           );
           if (catalogRes?.items) {
             setRelatedProducts(catalogRes.items.filter((p) => p.id !== productId));
@@ -67,7 +72,8 @@ export default function ProductDetailPage() {
     if (!reviewBody.trim() || !reviewName.trim() || !productId) return;
     setSubmittingReview(true);
     try {
-      await api.post(`/storefront/products/${productId}/reviews`, {
+      const reviewPath = await sfPath(`/products/${productId}/reviews`);
+      await api.post(reviewPath, {
         rating: reviewRating,
         customer_name: reviewName,
         title: `${reviewRating} stars rating`,
@@ -77,7 +83,8 @@ export default function ProductDetailPage() {
       setReviewName("");
       setReviewBody("");
       // Reload product to show new review
-      const updated = await api.get<StorefrontProductDetail>(`/storefront/products/${productId}`);
+      const detailPath = await sfPath(`/products/${productId}`);
+      const updated = await api.get<StorefrontProductDetail>(detailPath);
       setProduct(updated);
     } catch {
       // ignore

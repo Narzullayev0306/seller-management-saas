@@ -6,6 +6,7 @@ import { BagIcon, CheckIcon, LockIcon, XIcon } from "@/components/storefront/ico
 import { api } from "@/lib/api-client";
 import { formatMoney } from "@/lib/format";
 import { useStorefront } from "@/lib/storefront-context";
+import { sfPath } from "@/lib/storefront-slug";
 import type { StorefrontCheckoutResult } from "@/lib/types";
 
 interface CheckoutModalProps {
@@ -64,7 +65,14 @@ export function CheckoutModal({ open, onClose }: CheckoutModalProps) {
         discount: cartDiscount > 0 ? cartDiscount : undefined,
         items: cart.map((i) => ({ product_id: i.product.id, quantity: i.quantity })),
       };
-      const res = await api.post<StorefrontCheckoutResult>("/storefront/checkout", payload);
+      const key =
+        window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const path = await sfPath("/checkout");
+      const res = await api.post<StorefrontCheckoutResult>(
+        path,
+        payload,
+        { "Idempotency-Key": key },
+      );
       setResult(res);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Checkout failed — please try again");

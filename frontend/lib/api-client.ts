@@ -73,10 +73,13 @@ async function parseError(resp: Response): Promise<ApiError> {
 
 async function rawRequest(
   path: string,
-  options: { method?: string; body?: unknown; query?: ListQuery } = {},
+  options: { method?: string; body?: unknown; query?: ListQuery; headers?: Record<string, string> } = {},
   token: string | null,
 ): Promise<Response> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
   if (token) headers.Authorization = `Bearer ${token}`;
   const resp = await fetch(buildUrl(path, options.query), {
     method: options.method ?? "GET",
@@ -103,7 +106,7 @@ async function refreshAccess(refresh: string): Promise<string> {
 
 export async function apiRequest<T>(
   path: string,
-  options: { method?: string; body?: unknown; query?: ListQuery } = {},
+  options: { method?: string; body?: unknown; query?: ListQuery; headers?: Record<string, string> } = {},
 ): Promise<T> {
   const { access, refresh } = getTokens();
 
@@ -127,7 +130,8 @@ export async function apiRequest<T>(
 
 export const api = {
   get: <T>(path: string, query?: ListQuery) => apiRequest<T>(path, { query }),
-  post: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: "POST", body }),
+  post: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
+    apiRequest<T>(path, { method: "POST", body, headers }),
   put: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: "PUT", body }),
   patch: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: "PATCH", body }),
   delete: (path: string) => apiRequest<void>(path, { method: "DELETE" }),

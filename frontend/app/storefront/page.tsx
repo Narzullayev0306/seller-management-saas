@@ -14,6 +14,7 @@ import { StorefrontShell } from "@/components/storefront/StorefrontShell";
 import { WishlistDrawer } from "@/components/storefront/WishlistDrawer";
 import { api } from "@/lib/api-client";
 import { StorefrontProvider, useStorefront } from "@/lib/storefront-context";
+import { sfPath } from "@/lib/storefront-slug";
 import type {
   StorefrontBrand,
   StorefrontCatalogResponse,
@@ -82,32 +83,34 @@ function StorefrontPageInner() {
     let cancelled = false;
     const t = setTimeout(() => {
       setLoading(true);
-      api
-        .get<StorefrontCatalogResponse>("/storefront/catalog", {
-          page: query.page,
-          page_size: PAGE_SIZE,
-          search: query.search || undefined,
-          category: query.category || undefined,
-          brand: query.brand || undefined,
-          sort_by: query.sort_by || undefined,
-        })
-        .then((res) => {
-          if (cancelled) return;
-          setItems((prev) => (query.page === 1 ? res.items : [...prev, ...res.items]));
-          setTotal(res.total);
-          setTotalPages(res.total_pages);
-          setCategories(res.categories);
-          setError("");
-        })
-        .catch((err: unknown) => {
-          if (!cancelled) {
-            setError(err instanceof Error ? err.message : "Failed to load products");
-            if (query.page === 1) setItems([]);
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
+      sfPath("/catalog").then((path) =>
+        api
+          .get<StorefrontCatalogResponse>(path, {
+            page: query.page,
+            page_size: PAGE_SIZE,
+            search: query.search || undefined,
+            category: query.category || undefined,
+            brand: query.brand || undefined,
+            sort_by: query.sort_by || undefined,
+          })
+          .then((res) => {
+            if (cancelled) return;
+            setItems((prev) => (query.page === 1 ? res.items : [...prev, ...res.items]));
+            setTotal(res.total);
+            setTotalPages(res.total_pages);
+            setCategories(res.categories);
+            setError("");
+          })
+          .catch((err: unknown) => {
+            if (!cancelled) {
+              setError(err instanceof Error ? err.message : "Failed to load products");
+              if (query.page === 1) setItems([]);
+            }
+          })
+          .finally(() => {
+            if (!cancelled) setLoading(false);
+          }),
+      );
     }, 0);
     return () => {
       cancelled = true;
@@ -117,14 +120,16 @@ function StorefrontPageInner() {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .get<StorefrontCatalogResponse>("/storefront/catalog", { featured: "true", page_size: 1 })
-      .then((res) => {
-        if (!cancelled) setFeaturedCount(res.total);
-      })
-      .catch(() => {
-        if (!cancelled) setFeaturedCount(null);
-      });
+    sfPath("/catalog").then((path) =>
+      api
+        .get<StorefrontCatalogResponse>(path, { featured: "true", page_size: 1 })
+        .then((res) => {
+          if (!cancelled) setFeaturedCount(res.total);
+        })
+        .catch(() => {
+          if (!cancelled) setFeaturedCount(null);
+        }),
+    );
     return () => {
       cancelled = true;
     };
@@ -132,14 +137,16 @@ function StorefrontPageInner() {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .get<StorefrontBrand[]>("/storefront/brands")
-      .then((res) => {
-        if (!cancelled) setAllBrands(res);
-      })
-      .catch(() => {
-        if (!cancelled) setAllBrands([]);
-      });
+    sfPath("/brands").then((path) =>
+      api
+        .get<StorefrontBrand[]>(path)
+        .then((res) => {
+          if (!cancelled) setAllBrands(res);
+        })
+        .catch(() => {
+          if (!cancelled) setAllBrands([]);
+        }),
+    );
     return () => {
       cancelled = true;
     };

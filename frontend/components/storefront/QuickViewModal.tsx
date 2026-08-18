@@ -19,6 +19,7 @@ import {
 import { formatDateShort, formatMoney } from "@/lib/format";
 import { api } from "@/lib/api-client";
 import { toNumber, useStorefront } from "@/lib/storefront-context";
+import { sfPath } from "@/lib/storefront-slug";
 import type { StorefrontProduct, StorefrontProductDetail } from "@/lib/types";
 
 type TabKey = "details" | "reviews" | "price";
@@ -73,14 +74,16 @@ export function QuickViewModal({ product, onClose }: QuickViewModalProps) {
     setBisEmail("");
 
     let cancelled = false;
-    api
-      .get<StorefrontProductDetail>(`/storefront/products/${product.id}`)
-      .then((res) => {
-        if (!cancelled) setDetail(res);
-      })
-      .catch(() => {
-        if (!cancelled) setDetail(null);
-      });
+    sfPath(`/products/${product.id}`).then((path) =>
+      api
+        .get<StorefrontProductDetail>(path)
+        .then((res) => {
+          if (!cancelled) setDetail(res);
+        })
+        .catch(() => {
+          if (!cancelled) setDetail(null);
+        }),
+    );
 
     return () => {
       cancelled = true;
@@ -126,7 +129,8 @@ export function QuickViewModal({ product, onClose }: QuickViewModalProps) {
     if (!bisEmail.trim()) return;
     setBisStatus("loading");
     try {
-      await api.post(`/storefront/products/${product.id}/back-in-stock`, { email: bisEmail.trim() });
+      const path = await sfPath(`/products/${product.id}/back-in-stock`);
+      await api.post(path, { email: bisEmail.trim() });
       setBisStatus("done");
     } catch {
       setBisStatus("error");
