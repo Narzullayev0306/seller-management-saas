@@ -7,15 +7,52 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.exceptions import forbidden, unauthorized
+from app.core.exceptions import ApiError, forbidden, unauthorized
 from app.core.security import decode_access_token
 from app.db.session import get_db
+from app.models.customer_account import CustomerAccount
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember
 from app.models.role import Role, user_roles
 from app.models.user import User
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def get_current_customer(
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> CustomerAccount:
+    """Resolve the storefront customer account from a customer-kind JWT."""
+    if credentials is None:
+        raise unauthorized()
+    payload = decode_access_token(credentials.credentials)
+    if payload.get("kind") != "customer":
+        raise unauthorized("INVALID_TOKEN", "Invalid access token")
+    account = db.execute(
+        select(CustomerAccount).where(
+            CustomerAccount.id == payload["sub"],
+        )
+    ).scalar_one_or_none()
+    if account is None or not account.is_active:
+        raise unauthorized("INVALID_TOKEN", "Invalid access token")
+    org = db.get(Organization, account.organization_id)
+    if org is None or not org.is_active:
+        raise unauthorized("ORG_INACTIVE", "This company is no longer active")
+    return account
+
+
+def optional_current_customer(
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> CustomerAccount | None:
+    """Like get_current_customer, but returns None for missing/invalid tokens."""
+    if credentials is None:
+        return None
+    try:
+        return get_current_customer(db, credentials)
+    except ApiError:
+        return None
 
 
 def get_current_user(
@@ -25,6 +62,8 @@ def get_current_user(
     if credentials is None:
         raise unauthorized()
     payload = decode_access_token(credentials.credentials)
+    if payload.get("kind", "user") != "user":
+        raise unauthorized("INVALID_TOKEN", "Invalid access token")
     user = db.execute(
         select(User).where(User.id == payload["sub"])
     ).scalar_one_or_none()

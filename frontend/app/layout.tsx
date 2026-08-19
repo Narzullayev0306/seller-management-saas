@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { AuthProvider } from "@/lib/auth";
+import { CustomerAuthProvider } from "@/lib/customer-auth";
 import { ThemeInitScript, ThemeProvider } from "@/lib/theme";
 import "./globals.css";
 
@@ -38,7 +39,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100">
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <CustomerAuthProvider>{children}</CustomerAuthProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

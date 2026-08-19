@@ -13,7 +13,7 @@ import {
   TagIcon,
   XIcon,
 } from "@/components/storefront/icons";
-import { useAuth } from "@/lib/auth";
+import { useCustomerAuth } from "@/lib/customer-auth";
 import { useStorefront } from "@/lib/storefront-context";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -42,7 +42,7 @@ export function StorefrontShell({
   onClearFilters,
   featuredCount,
 }: StorefrontShellProps) {
-  const { user, logout } = useAuth();
+  const { customer, logout } = useCustomerAuth();
   const { cartCount, wishlist } = useStorefront();
   const [searchInput, setSearchInput] = useState("");
   const [categoriesOpen, setCategoriesOpen] = useState(false);
@@ -191,7 +191,7 @@ export function StorefrontShell({
               </button>
 
               {/* User Account Menu / Login */}
-              {user ? (
+              {customer ? (
                 <div className="relative">
                   <button
                     type="button"
@@ -199,10 +199,10 @@ export function StorefrontShell({
                     className="flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                      {user.full_name.slice(0, 2).toUpperCase()}
+                      {(customer.full_name || "C").slice(0, 2).toUpperCase()}
                     </span>
                     <span className="hidden text-xs font-medium text-slate-700 dark:text-slate-200 lg:block max-w-28 truncate">
-                      {user.full_name.split(" ")[0]}
+                      {customer.full_name.split(" ")[0] || "Customer"}
                     </span>
                   </button>
                   {userMenuOpen && (
@@ -210,10 +210,10 @@ export function StorefrontShell({
                       <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
                       <div className="absolute right-0 z-20 mt-2 w-52 animate-in fade-in zoom-in-95 duration-150 origin-top-right rounded-2xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
                         <div className="border-b border-slate-100 px-4 py-2.5 dark:border-slate-800">
-                          <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{user.full_name}</p>
-                          <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{user.email}</p>
+                          <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{customer.full_name}</p>
+                          <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{customer.email}</p>
                           <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                            {user.roles.map((r) => r.name).join(", ") || "Customer"}
+                            Customer
                           </span>
                         </div>
                         <div className="py-1 border-b border-slate-100 dark:border-slate-800">
@@ -249,13 +249,13 @@ export function StorefrontShell({
               ) : (
                 <div className="flex items-center gap-1.5">
                   <Link
-                    href="/login"
+                    href="/storefront/auth/login"
                     className="rounded-xl px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                   >
                     Sign in
                   </Link>
                   <Link
-                    href="/register"
+                    href="/storefront/auth/register"
                     className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500"
                   >
                     Register

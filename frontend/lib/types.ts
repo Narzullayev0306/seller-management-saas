@@ -434,3 +434,61 @@ export interface StorefrontCatalogResponse {
   categories: string[];
   brands: string[];
 }
+
+export interface CustomerMe {
+  id: string;
+  customer_id: string | null;
+  email: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  phone: string | null;
+  address: string | null;
+  is_active: boolean;
+}
+
+export interface CustomerTokenPair {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+export interface CustomerRegisterInput {
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+
+export interface CustomerProfileUpdate {
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  address?: string;
+  current_password?: string;
+  password?: string;
+}
+
+export interface CartItemRead {
+  id: string;
+  product_id: string;
+  product_variant_id: string | null;
+  name: string;
+  sku: string;
+  price: string | number;
+  image_url: string | null;
+  variant_name: string | null;
+  variant_attributes: Record<string, string> | null;
+  quantity: number;
+  stock_quantity: number;
+  subtotal: string | number;
+  created_at: string;
+}
+
+export interface CartRead {
+  cart_id: string;
+  items: CartItemRead[];
+  item_count: number;
+  subtotal: string | number;
+}

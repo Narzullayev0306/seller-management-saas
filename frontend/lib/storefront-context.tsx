@@ -1,13 +1,36 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-import type { StorefrontProduct } from "@/lib/types";
+import { customerRequest } from "@/lib/customer-auth";
+import { sfPath } from "@/lib/storefront-slug";
+import type { CartRead, CartItemRead, StorefrontProduct } from "@/lib/types";
 
 export interface CartItem {
   product: StorefrontProduct;
   quantity: number;
+  serverId?: string;
+}
+
+function toCartItem(item: CartItemRead): CartItem {
+  return {
+    product: {
+      id: item.product_id,
+      name: item.name,
+      category: "",
+      price: item.price,
+      stock_quantity: item.stock_quantity,
+      stock_status: item.stock_quantity > 0 ? "in_stock" : "out_of_stock",
+      image_url: item.image_url,
+      brand_name: null,
+      rating: null,
+      review_count: 0,
+      featured: false,
+    },
+    quantity: item.quantity,
+    serverId: item.id,
+  };
 }
 
 interface StorefrontContextValue {
@@ -73,6 +96,11 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
   const [viewedProducts, setViewedProducts] = useState<Record<string, StorefrontProduct>>({});
   const [promo, setPromo] = useState<string | null>(null);
+  const cartRef = useRef<CartItem[]>([]);
+
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -81,6 +109,34 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
       setPromo(readStorage<string>(PROMO_KEY) ?? null);
     }, 0);
     return () => clearTimeout(t);
+  }, []);
+
+  // Sync the persisted cart with the backend cart (guest or customer) once.
+  useEffect(() => {
+    let cancelled = false;
+    async function syncFromServer() {
+      try {
+        const path = await sfPath("/cart");
+        const res = await customerRequest<CartRead>(path);
+        if (cancelled) return;
+        setCart((prev) => {
+          const server = res.items.map(toCartItem);
+          const merged = [...server];
+          for (const local of prev) {
+            if (!merged.some((m) => m.product.id === local.product.id)) {
+              merged.push(local);
+            }
+          }
+          return merged;
+        });
+      } catch {
+        // backend unavailable — keep the local cart
+      }
+    }
+    void syncFromServer();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -105,22 +161,69 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
       }
       return [...prev, { product, quantity }];
     });
+    void (async () => {
+      try {
+        const path = await sfPath("/cart/items");
+        const res = await customerRequest<CartRead>(path, {
+          method: "POST",
+          body: { product_id: product.id, quantity },
+        });
+        setCart(res.items.map(toCartItem));
+      } catch {
+        // keep the optimistic local cart if the backend is unavailable
+      }
+    })();
   }, []);
 
   const removeFromCart = useCallback((productId: string) => {
+    const serverId = cartRef.current.find((i) => i.product.id === productId)?.serverId;
     setCart((prev) => prev.filter((i) => i.product.id !== productId));
+    void (async () => {
+      try {
+        const path = serverId
+          ? await sfPath(`/cart/items/${serverId}`)
+          : await sfPath("/cart");
+        const res = await customerRequest<CartRead>(path, { method: "DELETE" });
+        setCart(res.items.map(toCartItem));
+      } catch {
+        // keep local state
+      }
+    })();
   }, []);
 
   const setQuantity = useCallback((productId: string, quantity: number) => {
+    const serverId = cartRef.current.find((i) => i.product.id === productId)?.serverId;
     setCart((prev) =>
       quantity <= 0
         ? prev.filter((i) => i.product.id !== productId)
         : prev.map((i) => (i.product.id === productId ? { ...i, quantity } : i)),
     );
+    void (async () => {
+      if (!serverId) return;
+      try {
+        const path = await sfPath(`/cart/items/${serverId}`);
+        const res = await customerRequest<CartRead>(path, {
+          method: "PATCH",
+          body: { quantity },
+        });
+        setCart(res.items.map(toCartItem));
+      } catch {
+        // keep local state
+      }
+    })();
   }, []);
 
   const clearCart = useCallback(() => {
     setCart([]);
+    void (async () => {
+      try {
+        const path = await sfPath("/cart");
+        const res = await customerRequest<CartRead>(path, { method: "DELETE" });
+        setCart(res.items.map(toCartItem));
+      } catch {
+        // keep local state
+      }
+    })();
   }, []);
 
   const toggleWishlist = useCallback((product: StorefrontProduct) => {

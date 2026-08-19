@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { BagIcon, CheckIcon, LockIcon, XIcon } from "@/components/storefront/icons";
 import { api } from "@/lib/api-client";
+import { cartHeaders } from "@/lib/customer-auth";
 import { formatMoney } from "@/lib/format";
 import { useStorefront } from "@/lib/storefront-context";
 import { sfPath } from "@/lib/storefront-slug";
@@ -71,7 +72,7 @@ export function CheckoutModal({ open, onClose }: CheckoutModalProps) {
       const res = await api.post<StorefrontCheckoutResult>(
         path,
         payload,
-        { "Idempotency-Key": key },
+        { "Idempotency-Key": key, ...cartHeaders() },
       );
       setResult(res);
     } catch (err) {

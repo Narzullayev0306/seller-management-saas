@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from app.models.audit_log import AuditLog
 from app.models.auth_token import AuthToken
+from app.models.cart import Cart, CartItem
 from app.models.coupon import Coupon, CouponRedemption
 from app.models.customer import Customer
+from app.models.customer_account import CustomerAccount, CustomerRefreshToken
 from app.models.idempotency import IdempotencyKey
 from app.models.inventory import InventoryMovement
 from app.models.notification import Notification
@@ -33,7 +35,11 @@ __all__ = [
     "AuthToken",
     "BackInStockRequest",
     "Brand",
+    "Cart",
+    "CartItem",
     "Customer",
+    "CustomerAccount",
+    "CustomerRefreshToken",
     "Coupon",
     "CouponRedemption",
     "IdempotencyKey",

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request, not_found
 from app.models.customer import Customer
+from app.models.customer_account import CustomerAccount
 from app.models.organization import Organization
 from app.models.product import Product
 from app.models.storefront import (
@@ -351,11 +352,26 @@ class StorefrontService:
 
     # ---- checkout ---------------------------------------------------------
 
-    def checkout(self, payload: CheckoutCreate) -> CheckoutResult:
+    def checkout(
+        self,
+        payload: CheckoutCreate,
+        customer_account: CustomerAccount | None = None,
+    ) -> CheckoutResult:
         org_id = self.organization_id
-        customer = self._find_customer(org_id, payload.email)
-        if customer is None:
-            customer = self._create_customer(org_id, payload)
+        if customer_account is not None:
+            customer = self.db.get(Customer, customer_account.customer_id)
+            if customer is None:
+                raise bad_request(
+                    "CUSTOMER_MISSING", "Linked customer record not found"
+                )
+            customer.first_name = payload.first_name
+            customer.last_name = payload.last_name
+            customer.phone = payload.phone
+            customer.address = payload.address
+        else:
+            customer = self._find_customer(org_id, payload.email)
+            if customer is None:
+                customer = self._create_customer(org_id, payload)
 
         order_create = OrderCreate(
             seller_id=None,
