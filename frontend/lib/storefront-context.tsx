@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 import { customerRequest } from "@/lib/customer-auth";
 import { sfPath } from "@/lib/storefront-slug";
-import type { CartRead, CartItemRead, StorefrontProduct } from "@/lib/types";
+import type { CartRead, CartItemRead, StorefrontProduct, WishlistItemRead, WishlistRead } from "@/lib/types";
 
 export interface CartItem {
   product: StorefrontProduct;
@@ -29,6 +29,30 @@ function toCartItem(item: CartItemRead): CartItem {
       featured: false,
     },
     quantity: item.quantity,
+    serverId: item.id,
+  };
+}
+
+export interface WishlistItem {
+  product: StorefrontProduct;
+  serverId?: string;
+}
+
+function toWishlistItem(item: WishlistItemRead): WishlistItem {
+  return {
+    product: {
+      id: item.product_id,
+      name: item.name,
+      category: "",
+      price: item.price,
+      stock_quantity: item.in_stock ? 1 : 0,
+      stock_status: item.in_stock ? "in_stock" : "out_of_stock",
+      image_url: item.image_url,
+      brand_name: null,
+      rating: null,
+      review_count: 0,
+      featured: false,
+    },
     serverId: item.id,
   };
 }
@@ -92,20 +116,25 @@ export function toNumber(value: string | number): number {
 
 export function StorefrontProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [wishlist, setWishlist] = useState<StorefrontProduct[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
   const [viewedProducts, setViewedProducts] = useState<Record<string, StorefrontProduct>>({});
   const [promo, setPromo] = useState<string | null>(null);
   const cartRef = useRef<CartItem[]>([]);
+  const wishlistRef = useRef<WishlistItem[]>([]);
 
   useEffect(() => {
     cartRef.current = cart;
   }, [cart]);
 
   useEffect(() => {
+    wishlistRef.current = wishlist;
+  }, [wishlist]);
+
+  useEffect(() => {
     const t = setTimeout(() => {
       setCart(readStorage<CartItem[]>(CART_KEY) ?? []);
-      setWishlist(readStorage<StorefrontProduct[]>(WISHLIST_KEY) ?? []);
+      setWishlist(readStorage<WishlistItem[]>(WISHLIST_KEY) ?? []);
       setPromo(readStorage<string>(PROMO_KEY) ?? null);
     }, 0);
     return () => clearTimeout(t);
@@ -134,6 +163,34 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
       }
     }
     void syncFromServer();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Sync the persisted wishlist with the backend wishlist (guest or customer) once.
+  useEffect(() => {
+    let cancelled = false;
+    async function syncWishlistFromServer() {
+      try {
+        const path = await sfPath("/wishlist");
+        const res = await customerRequest<WishlistRead>(path);
+        if (cancelled) return;
+        setWishlist((prev) => {
+          const server = res.items.map(toWishlistItem);
+          const merged = [...server];
+          for (const local of prev) {
+            if (!merged.some((m) => m.product.id === local.product.id)) {
+              merged.push(local);
+            }
+          }
+          return merged;
+        });
+      } catch {
+        // backend unavailable — keep the local wishlist
+      }
+    }
+    void syncWishlistFromServer();
     return () => {
       cancelled = true;
     };
@@ -227,15 +284,32 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleWishlist = useCallback((product: StorefrontProduct) => {
+    const existing = wishlistRef.current.find((w) => w.product.id === product.id);
+    const removing = existing !== undefined;
+    const serverId = existing?.serverId;
     setWishlist((prev) =>
-      prev.some((p) => p.id === product.id)
-        ? prev.filter((p) => p.id !== product.id)
-        : [product, ...prev],
+      removing
+        ? prev.filter((p) => p.product.id !== product.id)
+        : [{ product, serverId: undefined }, ...prev],
     );
+    void (async () => {
+      try {
+        const path = await sfPath(removing && serverId ? `/wishlist/items/${serverId}` : "/wishlist/items");
+        const res = removing
+          ? await customerRequest<WishlistRead>(path, { method: "DELETE" })
+          : await customerRequest<WishlistRead>(path, {
+              method: "POST",
+              body: { product_id: product.id },
+            });
+        setWishlist(res.items.map(toWishlistItem));
+      } catch {
+        // keep the optimistic local wishlist if the backend is unavailable
+      }
+    })();
   }, []);
 
   const isWishlisted = useCallback(
-    (productId: string) => wishlist.some((p) => p.id === productId),
+    (productId: string) => wishlist.some((p) => p.product.id === productId),
     [wishlist],
   );
 
@@ -276,6 +350,10 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
     [cartSubtotal, cartDiscount, shippingCost],
   );
   const cartCount = useMemo(() => cart.reduce((sum, i) => sum + i.quantity, 0), [cart]);
+  const wishlistProducts = useMemo(
+    () => wishlist.map((w) => w.product),
+    [wishlist],
+  );
 
   const value = useMemo<StorefrontContextValue>(
     () => ({
@@ -290,7 +368,7 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
       freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
       shippingCost,
       cartTotal,
-      wishlist,
+      wishlist: wishlistProducts,
       toggleWishlist,
       isWishlisted,
       recentlyViewed,
@@ -311,7 +389,7 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
       cartDiscount,
       shippingCost,
       cartTotal,
-      wishlist,
+      wishlistProducts,
       toggleWishlist,
       isWishlisted,
       recentlyViewed,

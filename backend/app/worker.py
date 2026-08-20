@@ -21,6 +21,7 @@ import app.models  # noqa: F401  (register every mapper before any session use)
 from app.db.session import SessionLocal
 from app.models.product import Product
 from app.models.storefront import BackInStockRequest
+from app.services import webhook_service
 from app.services.email_service import render, send_email
 from app.services.notification_service import (
     notify_low_stock,
@@ -89,6 +90,7 @@ def handle_event(db: Session, event) -> None:
         )
     else:
         raise ValueError(f"Unknown event type: {event_type}")
+    webhook_service.deliver_event(db, event)
 
 
 def process_pending(db: Session, limit: int = 50) -> int:

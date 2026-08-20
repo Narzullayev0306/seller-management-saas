@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.payment import Payment
     from app.models.product import Product
+    from app.models.refund import Refund, ReturnRequest
     from app.models.sale import Sale
     from app.models.seller import Seller
     from app.models.user import User
@@ -64,6 +65,12 @@ class Order(TimestampMixin, Base):
         back_populates="order", uselist=False, cascade="all, delete-orphan"
     )
     payments: Mapped[list[Payment]] = relationship(back_populates="order")
+    return_requests: Mapped[list[ReturnRequest]] = relationship(
+        back_populates="order", cascade="all, delete-orphan"
+    )
+    refunds: Mapped[list[Refund]] = relationship(
+        back_populates="order", cascade="all, delete-orphan"
+    )
 
 
 class OrderItem(Base):

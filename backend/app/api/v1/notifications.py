@@ -12,6 +12,8 @@ from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.notification import (
     NotificationListParams,
+    NotificationPreferenceRead,
+    NotificationPreferenceUpdate,
     NotificationRead,
     UnreadCount,
 )
@@ -138,3 +140,45 @@ def mark_all_read(
         count += 1
     db.commit()
     return UnreadCount(count=count)
+
+
+def _prefs_to_read(pref) -> NotificationPreferenceRead:
+    return NotificationPreferenceRead(
+        in_app_enabled=pref.in_app_enabled,
+        email_enabled=pref.email_enabled,
+        new_order_alerts=pref.new_order_alerts,
+        low_stock_alerts=pref.low_stock_alerts,
+        marketing_emails=pref.marketing_emails,
+    )
+
+
+@router.get(
+    "/preferences",
+    response_model=NotificationPreferenceRead,
+    summary="Get notification preferences",
+    description="Reads the caller's notification preferences, creating defaults on first access.",
+)
+def get_preferences(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permissions("notifications.read")),
+) -> NotificationPreferenceRead:
+    from app.services.notification_service import get_preferences as svc
+
+    return _prefs_to_read(svc(db, user))
+
+
+@router.put(
+    "/preferences",
+    response_model=NotificationPreferenceRead,
+    summary="Update notification preferences",
+    description="Partially updates the caller's notification preferences.",
+)
+def update_preferences(
+    payload: NotificationPreferenceUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permissions("notifications.read")),
+) -> NotificationPreferenceRead:
+    from app.services.notification_service import update_preferences as svc
+
+    pref = svc(db, user, payload.model_dump(exclude_unset=True))
+    return _prefs_to_read(pref)

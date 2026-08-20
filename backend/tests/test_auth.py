@@ -145,13 +145,28 @@ async def test_refresh_rotates_token(client, org_a):
     new_refresh = first.json()["refresh_token"]
     assert new_refresh != org_a["refresh_token"]
 
+    second = await client.post("/api/v1/auth/refresh", json={"refresh_token": new_refresh})
+    assert second.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_reused_revoked_token_revokes_whole_family(client, org_a):
+    """Reuse of a revoked refresh token compromises the family: every token in
+    the family (including the rotated successor) must be revoked."""
+    first = await client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": org_a["refresh_token"]}
+    )
+    assert first.status_code == 200
+    new_refresh = first.json()["refresh_token"]
+
     reuse = await client.post(
         "/api/v1/auth/refresh", json={"refresh_token": org_a["refresh_token"]}
     )
     assert reuse.status_code == 401
 
+    # The rotated token shares the same family and must be dead too.
     second = await client.post("/api/v1/auth/refresh", json={"refresh_token": new_refresh})
-    assert second.status_code == 200
+    assert second.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -165,6 +180,74 @@ async def test_logout_revokes_refresh(client, org_a):
         "/api/v1/auth/refresh", json={"refresh_token": org_a["refresh_token"]}
     )
     assert reuse.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_list_sessions_and_revoke(client, org_a):
+    headers = {"Authorization": f"Bearer {org_a['access_token']}"}
+    sessions = await client.get("/api/v1/auth/sessions", headers=headers)
+    assert sessions.status_code == 200
+    body = sessions.json()
+    assert isinstance(body, list) and len(body) >= 1
+    assert "family_id" in body[0]
+    assert "user_agent" in body[0]
+    assert "created_ip" in body[0]
+
+    sid = body[0]["id"]
+    resp = await client.delete(f"/api/v1/auth/sessions/{sid}", headers=headers)
+    assert resp.status_code == 204
+
+    remaining = await client.get("/api/v1/auth/sessions", headers=headers)
+    assert all(s["id"] != sid for s in remaining.json())
+
+
+@pytest.mark.asyncio
+async def test_revoke_other_sessions_keeps_current(client, org_a):
+    # Second login = a second device/session.
+    login_resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": org_a["email"], "password": org_a["password"]},
+    )
+    assert login_resp.status_code == 200
+    second_access = login_resp.json()["access_token"]
+
+    current_id = (
+        await client.get(
+            "/api/v1/auth/sessions",
+            headers={"Authorization": f"Bearer {second_access}"},
+        )
+    ).json()[0]["id"]
+
+    resp = await client.post(
+        "/api/v1/auth/sessions/revoke-others",
+        headers={"Authorization": f"Bearer {second_access}"},
+        json={"current_session_id": current_id},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["revoked"] >= 1
+
+    sessions = await client.get(
+        "/api/v1/auth/sessions",
+        headers={"Authorization": f"Bearer {second_access}"},
+    )
+    assert len(sessions.json()) == 1
+    assert sessions.json()[0]["id"] == current_id
+
+
+@pytest.mark.asyncio
+async def test_cannot_revoke_other_users_session(client, org_a, org_b):
+    other_session = (
+        await client.get(
+            "/api/v1/auth/sessions",
+            headers={"Authorization": f"Bearer {org_b['access_token']}"},
+        )
+    ).json()[0]["id"]
+
+    resp = await client.delete(
+        f"/api/v1/auth/sessions/{other_session}",
+        headers={"Authorization": f"Bearer {org_a['access_token']}"},
+    )
+    assert resp.status_code == 404
 
 
 @pytest.mark.asyncio

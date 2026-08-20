@@ -7,7 +7,7 @@ separately in `email_service`.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -16,6 +16,12 @@ from sqlalchemy.orm import Session
 from app.models.notification import Notification
 from app.models.role import role_permissions
 from app.models.user import User
+
+if TYPE_CHECKING:
+    from app.models.notification_preference import NotificationPreference
+
+if TYPE_CHECKING:
+    from app.models.notification_preference import NotificationPreference
 
 
 def notify(
@@ -74,7 +80,26 @@ def notify_permission_holders(
     message: str,
     data: dict[str, Any] | None = None,
 ) -> None:
+    from app.models.notification_preference import NotificationPreference
+
+    prefs = {
+        p.user_id: p
+        for p in db.execute(
+            select(NotificationPreference).where(
+                NotificationPreference.user_id.in_(
+                    select(User.id).where(User.organization_id == organization_id)
+                )
+            )
+        ).scalars()
+    }
     for user in users_with_permission(db, organization_id, permission_code, exclude_user_id):
+        pref = prefs.get(user.id)
+        if pref is not None and not pref.in_app_enabled:
+            continue
+        if pref is not None and type in ("new_order", "order_cancelled") and not pref.new_order_alerts:
+            continue
+        if pref is not None and type == "low_stock" and not pref.low_stock_alerts:
+            continue
         notify(
             db,
             organization_id=organization_id,
@@ -179,3 +204,30 @@ def notify_team_owner_transferred(
         message=f"Ownership was transferred to {new_owner_email}.",
         data={"new_owner": new_owner_email},
     )
+
+
+def get_preferences(db: Session, user: User) -> NotificationPreference:
+    """Return the user's notification preferences, creating defaults if needed."""
+    from app.models.notification_preference import NotificationPreference
+
+    pref = db.execute(
+        select(NotificationPreference).where(
+            NotificationPreference.user_id == user.id
+        )
+    ).scalar_one_or_none()
+    if pref is None:
+        pref = NotificationPreference(user_id=user.id)
+        db.add(pref)
+        db.flush()
+    return pref
+
+
+def update_preferences(db: Session, user: User, values: dict) -> NotificationPreference:
+    """Apply partial updates to the user's notification preferences."""
+    pref = get_preferences(db, user)
+    for field, value in values.items():
+        if value is not None and hasattr(pref, field):
+            setattr(pref, field, value)
+    db.commit()
+    db.refresh(pref)
+    return pref

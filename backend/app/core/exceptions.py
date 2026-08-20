@@ -26,8 +26,8 @@ def unauthorized(code: str = "UNAUTHORIZED", message: str = "Authentication requ
     return ApiError(401, code, message)
 
 
-def forbidden(code: str = "PERMISSION_DENIED", message: str = "Insufficient permissions") -> ApiError:
-    return ApiError(403, code, message)
+def forbidden(code: str = "PERMISSION_DENIED", message: str = "Insufficient permissions", details: dict[str, Any] | None = None) -> ApiError:
+    return ApiError(403, code, message, details)
 
 
 def not_found(entity: str = "Resource") -> ApiError:
@@ -36,3 +36,7 @@ def not_found(entity: str = "Resource") -> ApiError:
 
 def conflict(code: str, message: str) -> ApiError:
     return ApiError(409, code, message)
+
+
+def payment_required(code: str, message: str, details: dict[str, Any] | None = None) -> ApiError:
+    return ApiError(402, code, message, details)

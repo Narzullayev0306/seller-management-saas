@@ -50,6 +50,19 @@ def _client_ip(request: Request) -> str:
     return peer
 
 
+def client_ip(request: Request) -> str:
+    """Public helper: best-effort client IP for audit/session metadata."""
+    return _client_ip(request)
+
+
+def client_user_agent(request: Request) -> str | None:
+    """Public helper: trimmed User-Agent header for session metadata."""
+    ua = request.headers.get("user-agent")
+    if not ua:
+        return None
+    return ua[:512]
+
+
 def check_rate_limit(request: Request, scope: str, limit: int, window: int) -> None:
     """Fixed-window limit per client IP with Redis + in-memory fallback; raises 429 when exceeded."""
     client = _get_client()

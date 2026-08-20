@@ -13,6 +13,7 @@ from app.models.customer import Customer
 from app.models.customer_account import CustomerAccount
 from app.models.organization import Organization
 from app.models.product import Product
+from app.models.shipping_method import ShippingMethod
 from app.models.storefront import (
     BackInStockRequest,
     Brand,
@@ -373,11 +374,28 @@ class StorefrontService:
             if customer is None:
                 customer = self._create_customer(org_id, payload)
 
+        shipping_fee = Decimal("0")
+        if payload.shipping_method_id is not None:
+            method = self.db.execute(
+                select(ShippingMethod).where(
+                    ShippingMethod.organization_id == org_id,
+                    ShippingMethod.id == payload.shipping_method_id,
+                    ShippingMethod.is_active.is_(True),
+                )
+            ).scalar_one_or_none()
+            if method is None:
+                raise bad_request(
+                    "SHIPPING_METHOD_NOT_FOUND",
+                    "Shipping method does not exist or is inactive",
+                )
+            shipping_fee = method.price
+
         order_create = OrderCreate(
             seller_id=None,
             customer_id=customer.id,
             discount=payload.discount,
             tax=payload.tax,
+            shipping_fee=shipping_fee,
             coupon_code=payload.coupon_code,
             items=[
                 OrderItemInput(

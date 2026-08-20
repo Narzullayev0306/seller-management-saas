@@ -22,8 +22,13 @@ const NAV = [
   { href: "/dashboard/sellers", label: "Sellers", icon: "M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z", permission: "sellers.read" },
   { href: "/dashboard/suppliers", label: "Suppliers", icon: "M17 8v3a4 4 0 0 1-8 0V8a2 2 0 1 1 4 0v3a6 6 0 0 1-12 0V8a2 2 0 1 1 4 0v3a2 2 0 1 0 4 0V8a4 4 0 1 0-8 0v3a8 8 0 0 0 16 0V8a4 4 0 1 0-8 0m-2 0v5", permission: "suppliers.read" },
   { href: "/dashboard/inventory", label: "Inventory", icon: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12", permission: "inventory.read" },
+  { href: "/dashboard/purchase-orders", label: "Purchase Orders", icon: "M3 3v18h18M7 9h10M7 13h6", permission: "inventory.read" },
+  { href: "/dashboard/refunds", label: "Refunds", icon: "M4 4h16v6a4 4 0 0 1-4 4h-8a4 4 0 0 1-4-4V4zm8 10v7m-4-3 4 3 4-3", permission: "orders.read" },
   { href: "/dashboard/users", label: "Team", icon: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm14 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75", permission: "users.read" },
   { href: "/dashboard/audit", label: "Audit log", icon: "M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z", permission: "audit.read" },
+  { href: "/dashboard/webhooks", label: "Webhooks", icon: "M6 3v18M4 7l4 4-4 4M18 3v18M14 9l4 4-4 4", permission: "settings.read" },
+  { href: "/dashboard/api-keys", label: "API Keys", icon: "M15 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zm-4 4h8v3a2 2 0 0 1-2 2h-2v2h-2v2H9m-2-2v.01", permission: "settings.read" },
+  { href: "/dashboard/billing", label: "Billing", icon: "M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm2 0h2v2h4V7h8v10H7v-2h2v-2H7V7zm4 0v2h6V7h-6z", permission: "billing.read" },
   { href: "/dashboard/settings", label: "Settings", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.5-2-3.5-2.4 1a7.4 7.4 0 0 0-2-1.2L14.5 3h-5l-.4 2.6a7.4 7.4 0 0 0-2 1.2l-2.4-1-2 3.5 2 1.5a7.4 7.4 0 0 0 0 2.4l-2 1.5 2 3.5 2.4-1a7.4 7.4 0 0 0 2 1.2l.4 2.6h5l.4-2.6a7.4 7.4 0 0 0 2-1.2l2.4 1 2-3.5-2-1.5c.07-.4.1-.8.1-1.2z", permission: "settings.read" },
 ];
 

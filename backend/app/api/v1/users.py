@@ -159,6 +159,9 @@ def create_user(
     db: Session = Depends(get_db),
     actor: User = Depends(require_permissions("users.create")),
 ) -> UserRead:
+    from app.services.billing_service import check_usage_limit
+
+    check_usage_limit(db, actor.effective_organization_id, "users")
     existing = db.execute(
         select(User).where(User.email == payload.email.lower())
     ).scalar_one_or_none()

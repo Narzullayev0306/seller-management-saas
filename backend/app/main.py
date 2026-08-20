@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.exceptions import ApiError
+from app.core.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
 from app.db.session import SessionLocal
 from app.schemas.common import ErrorBody, ErrorEnvelope
 from app.services.rbac_service import (
@@ -19,6 +20,19 @@ from app.services.rbac_service import (
 
 logger = logging.getLogger("app")
 
+try:  # Sentry is optional; the app runs without it in local/offline setups.
+    import sentry_sdk
+
+    if settings.sentry_dsn and settings.app_env != "development":
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.app_env,
+            traces_sample_rate=0.1,
+        )
+        logger.info("Sentry initialized")
+except ImportError:  # pragma: no cover - optional dependency
+    sentry_sdk = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,6 +41,30 @@ async def lifespan(app: FastAPI):
         sync_system_role_permissions(db)
         db.commit()
     yield
+
+
+def _db_ready() -> bool:
+    """True when a trivial query succeeds against Postgres."""
+    from sqlalchemy import text
+
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+        return True
+    except Exception:  # pragma: no cover - defensive probe
+        return False
+
+
+def _redis_ready() -> bool:
+    """True when Redis is reachable. Skipped when Redis is disabled."""
+    if not settings.redis_enabled or not settings.redis_url:
+        return True
+    try:
+        from app.core.redis import redis_client
+
+        return bool(redis_client.ping())
+    except Exception:  # pragma: no cover - defensive probe
+        return False
 
 
 def create_app() -> FastAPI:
@@ -46,6 +84,9 @@ def create_app() -> FastAPI:
         "http://127.0.0.1:3001",
     ]
 
+    # Security headers and request IDs run first (outermost).
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(set(origins)),
@@ -82,6 +123,8 @@ def create_app() -> FastAPI:
     @app.exception_handler(Exception)
     async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        if sentry_sdk is not None:
+            sentry_sdk.capture_exception(exc)
         return JSONResponse(
             status_code=500,
             content=ErrorEnvelope(error=ErrorBody(
@@ -92,6 +135,27 @@ def create_app() -> FastAPI:
     @app.get("/api/health", tags=["system"])
     def health() -> dict:
         return {"status": "ok", "service": settings.app_name}
+
+    @app.get("/api/health/live", tags=["system"])
+    def health_live() -> dict:
+        return {"status": "ok"}
+
+    @app.get("/api/health/ready", tags=["system"])
+    def health_ready(request: Request) -> JSONResponse:
+        db_ok = _db_ready()
+        redis_ok = _redis_ready()
+        ready = db_ok and redis_ok
+        return JSONResponse(
+            status_code=200 if ready else 503,
+            content={
+                "status": "ok" if ready else "degraded",
+                "checks": {
+                    "database": "ok" if db_ok else "error",
+                    "redis": "ok" if redis_ok else "error",
+                },
+                "request_id": getattr(request.state, "request_id", None),
+            },
+        )
 
     return app
 

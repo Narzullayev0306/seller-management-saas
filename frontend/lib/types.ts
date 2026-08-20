@@ -371,6 +371,48 @@ export interface OrganizationSettings {
   created_at: string;
 }
 
+export interface Plan {
+  code: string;
+  name: string;
+  price: string;
+  description: string;
+  features: string[];
+  limits: Record<string, number | null>;
+}
+
+export interface BillingSummary {
+  plan: string;
+  plan_name: string;
+  price: string;
+  features: string[];
+  limits: Record<string, number | null>;
+  usage: Record<string, number>;
+  subscription_status: string;
+  period_end: string | null;
+}
+
+export interface Invoice {
+  id: string;
+  invoice_number: string;
+  plan: string;
+  amount: string;
+  currency: string;
+  status: string;
+  period_start: string | null;
+  period_end: string | null;
+  created_at: string;
+}
+
+export interface OrganizationDomain {
+  id: string;
+  domain: string;
+  status: "pending" | "verified";
+  verification_token: string;
+  verified_at: string | null;
+  is_primary: boolean;
+  created_at: string;
+}
+
 export type RangePreset = "today" | "7d" | "30d" | "90d" | "year";
 
 export interface StorefrontProduct {
@@ -491,4 +533,229 @@ export interface CartRead {
   items: CartItemRead[];
   item_count: number;
   subtotal: string | number;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  parent_id: string | null;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  product_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CategoryTreeNode extends Category {
+  children: CategoryTreeNode[];
+}
+
+export interface CategoryCreate {
+  name: string;
+  slug?: string;
+  parent_id?: string | null;
+  description?: string;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
+export interface CategoryUpdate {
+  name?: string;
+  slug?: string;
+  parent_id?: string | null;
+  description?: string;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
+export interface ShippingMethod {
+  id: string;
+  name: string;
+  description: string | null;
+  price: string | number;
+  min_order_amount: string | number | null;
+  max_order_amount: string | number | null;
+  estimated_delivery_days: number | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShippingMethodCreate {
+  name: string;
+  description?: string;
+  price: number;
+  min_order_amount?: number;
+  max_order_amount?: number;
+  estimated_delivery_days?: number;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export type ReturnStatus = "pending" | "approved" | "rejected" | "received" | "completed";
+
+export interface ReturnRequest {
+  id: string;
+  order_id: string;
+  order_item_id: string;
+  product_id: string;
+  product_variant_id: string | null;
+  product_name: string;
+  quantity: number;
+  reason: string | null;
+  condition: string;
+  status: ReturnStatus;
+  created_at: string;
+  decided_at: string | null;
+}
+
+export type RefundStatus = "pending" | "processed" | "failed";
+
+export interface Refund {
+  id: string;
+  order_id: string;
+  order_number: string;
+  return_request_id: string | null;
+  payment_id: string | null;
+  amount: string | number;
+  reason: string | null;
+  status: RefundStatus;
+  created_at: string;
+  processed_at: string | null;
+}
+
+export interface RefundCreate {
+  order_id: string;
+  amount: number;
+  reason?: string;
+  payment_id?: string;
+}
+
+export type PurchaseOrderStatus = "draft" | "ordered" | "received" | "cancelled";
+
+export interface PurchaseOrderItem {
+  id: string;
+  product_id: string;
+  product_name: string;
+  sku: string;
+  quantity: number;
+  unit_cost: string | number;
+  subtotal: string | number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  po_number: string;
+  status: PurchaseOrderStatus;
+  expected_date: string | null;
+  notes: string | null;
+  total: string | number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  received_at: string | null;
+  items: PurchaseOrderItem[];
+}
+
+export interface PurchaseOrderCreate {
+  supplier_id?: string | null;
+  expected_date?: string;
+  notes?: string;
+  items: { product_id: string; quantity: number; unit_cost: number }[];
+}
+
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  secret: string;
+  events: string[];
+  is_active: boolean;
+  last_delivered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookCreate {
+  name: string;
+  url: string;
+  events: string[];
+  is_active?: boolean;
+}
+
+export interface WebhookUpdate {
+  name?: string;
+  url?: string;
+  events?: string[];
+  is_active?: boolean;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  event_type: string;
+  response_status: number | null;
+  response_body: string | null;
+  error: string | null;
+  delivered_at: string | null;
+  created_at: string;
+}
+
+export interface WebhookTestResult {
+  ok: boolean;
+  response_status: number | null;
+  response_body: string | null;
+  error: string | null;
+}
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  is_active: boolean;
+  expires_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyWithSecret extends ApiKey {
+  key: string;
+}
+
+export interface ApiKeyCreate {
+  name: string;
+  scopes: string[];
+  expires_at?: string;
+}
+
+export interface ApiKeyUpdate {
+  name?: string;
+  scopes?: string[];
+  is_active?: boolean;
+  expires_at?: string | null;
+}
+
+export interface WishlistItemRead {
+  id: string;
+  product_id: string;
+  product_variant_id: string | null;
+  name: string;
+  sku: string;
+  price: string | number;
+  image_url: string | null;
+  variant_name: string | null;
+  variant_attributes: Record<string, string> | null;
+  in_stock: boolean;
+  created_at: string;
+}
+
+export interface WishlistRead {
+  wishlist_id: string;
+  items: WishlistItemRead[];
+  item_count: number;
 }

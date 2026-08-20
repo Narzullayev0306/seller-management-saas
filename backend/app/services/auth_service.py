@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import BackgroundTasks
 from sqlalchemy import select
@@ -49,7 +49,13 @@ def _enqueue_email(
 
 
 def _issue_tokens(
-    db: Session, user: User, organization_id: UUID | None = None
+    db: Session,
+    user: User,
+    organization_id: UUID | None = None,
+    *,
+    created_ip: str | None = None,
+    user_agent: str | None = None,
+    family_id: UUID | None = None,
 ) -> TokenPair:
     access_token = create_access_token(
         user.id, organization_id or user.organization_id
@@ -59,6 +65,9 @@ def _issue_tokens(
         RefreshToken(
             user_id=user.id,
             token_hash=hash_refresh_token(raw_refresh),
+            family_id=family_id or uuid4(),
+            created_ip=created_ip,
+            user_agent=user_agent,
             expires_at=refresh_token_expiry(),
         )
     )
@@ -70,6 +79,9 @@ def register(
     db: Session,
     payload: RegisterRequest,
     background_tasks: BackgroundTasks | None = None,
+    *,
+    created_ip: str | None = None,
+    user_agent: str | None = None,
 ) -> tuple[User, TokenPair]:
     existing = db.execute(
         select(User).where(User.email == payload.email.lower())
@@ -112,7 +124,7 @@ def register(
         lambda: email_service.send_verification_email(user.email, verification_token),
     )
 
-    tokens = _issue_tokens(db, user)
+    tokens = _issue_tokens(db, user, created_ip=created_ip, user_agent=user_agent)
     log_action(
         db,
         organization_id=org.id,
@@ -125,7 +137,14 @@ def register(
     return user, tokens
 
 
-def login(db: Session, email: str, password: str) -> tuple[User, TokenPair]:
+def login(
+    db: Session,
+    email: str,
+    password: str,
+    *,
+    created_ip: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[User, TokenPair]:
     user = db.execute(
         select(User).options(selectinload(User.roles)).where(User.email == email.lower())
     ).scalar_one_or_none()
@@ -136,7 +155,7 @@ def login(db: Session, email: str, password: str) -> tuple[User, TokenPair]:
     if not user.organization.is_active:
         raise forbidden("ORGANIZATION_DISABLED", "Your organization is disabled")
 
-    tokens = _issue_tokens(db, user)
+    tokens = _issue_tokens(db, user, created_ip=created_ip, user_agent=user_agent)
     log_action(
         db,
         organization_id=user.organization_id,
@@ -148,7 +167,13 @@ def login(db: Session, email: str, password: str) -> tuple[User, TokenPair]:
     return user, tokens
 
 
-def refresh(db: Session, raw_refresh: str) -> TokenPair:
+def refresh(
+    db: Session,
+    raw_refresh: str,
+    *,
+    created_ip: str | None = None,
+    user_agent: str | None = None,
+) -> TokenPair:
     token_hash = hash_refresh_token(raw_refresh)
     token = db.execute(
         select(RefreshToken)
@@ -160,6 +185,9 @@ def refresh(db: Session, raw_refresh: str) -> TokenPair:
 
     now = datetime.now(UTC)
     if token.revoked_at is not None:
+        # Reuse of a revoked token is a strong signal of theft: kill the
+        # entire token family (every descendant session from the same login).
+        _revoke_family(db, token.family_id, reason="reuse_of_revoked")
         raise unauthorized("REFRESH_TOKEN_REVOKED", "Refresh token has been revoked")
     if token.expires_at < now:
         raise unauthorized("REFRESH_TOKEN_EXPIRED", "Refresh token has expired")
@@ -168,9 +196,46 @@ def refresh(db: Session, raw_refresh: str) -> TokenPair:
 
     token.revoked_at = now
     db.flush()
-    new_tokens = _issue_tokens(db, token.user)
+    new_tokens = _issue_tokens(
+        db,
+        token.user,
+        created_ip=created_ip,
+        user_agent=user_agent,
+        family_id=token.family_id,
+    )
+    # Link the old token to its successor (audit/tracing of the rotation chain).
+    new_row = db.execute(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == hash_refresh_token(new_tokens.refresh_token)
+        )
+    ).scalar_one()
+    token.replaced_by = new_row.id
     db.commit()
     return new_tokens
+
+
+def _revoke_family(db: Session, family_id: UUID, reason: str) -> None:
+    """Revoke every active token in a compromised family."""
+    rows = db.execute(
+        select(RefreshToken).where(
+            RefreshToken.family_id == family_id,
+            RefreshToken.revoked_at.is_(None),
+        )
+    ).scalars().all()
+    if not rows:
+        return
+    for row in rows:
+        row.revoked_at = datetime.now(UTC)
+    org_id = rows[0].user.organization_id
+    db.flush()
+    log_action(
+        db,
+        organization_id=org_id,
+        user_id=rows[0].user_id,
+        action="auth.refresh_family_revoked",
+        meta={"family_id": str(family_id), "reason": reason},
+    )
+    db.commit()
 
 
 def logout(db: Session, raw_refresh: str) -> None:
@@ -187,6 +252,75 @@ def logout(db: Session, raw_refresh: str) -> None:
             action="auth.logout",
         )
         db.commit()
+
+
+def list_sessions(db: Session, user: User) -> list[dict]:
+    """Active (non-revoked, non-expired) refresh-token sessions for a user."""
+    now = datetime.now(UTC)
+    rows = db.execute(
+        select(RefreshToken)
+        .where(
+            RefreshToken.user_id == user.id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > now,
+        )
+        .order_by(RefreshToken.created_at.desc())
+    ).scalars().all()
+    return [
+        {
+            "id": str(t.id),
+            "family_id": str(t.family_id),
+            "created_at": t.created_at.isoformat(),
+            "created_ip": t.created_ip,
+            "user_agent": t.user_agent,
+            "expires_at": t.expires_at.isoformat(),
+        }
+        for t in rows
+    ]
+
+
+def revoke_session(db: Session, user: User, session_id: UUID) -> None:
+    """Revoke a single active session owned by the user."""
+    token = db.get(RefreshToken, session_id)
+    if token is None or token.user_id != user.id:
+        raise not_found("Session")
+    token.revoked_at = datetime.now(UTC)
+    log_action(
+        db,
+        organization_id=user.organization_id,
+        user_id=user.id,
+        action="auth.session_revoked",
+        meta={"session_id": str(session_id)},
+    )
+    db.commit()
+
+
+def revoke_other_sessions(db: Session, user: User, current_session_id: UUID | None) -> int:
+    """Revoke every active session except the current one. Returns count revoked."""
+    now = datetime.now(UTC)
+    rows = db.execute(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user.id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > now,
+        )
+    ).scalars().all()
+    revoked = 0
+    for token in rows:
+        if current_session_id is not None and token.id == current_session_id:
+            continue
+        token.revoked_at = now
+        revoked += 1
+    if revoked:
+        log_action(
+            db,
+            organization_id=user.organization_id,
+            user_id=user.id,
+            action="auth.other_sessions_revoked",
+            meta={"revoked": revoked},
+        )
+    db.commit()
+    return revoked
 
 
 def current_user_payload(db: Session, user: User) -> dict:
@@ -374,7 +508,9 @@ def invite_user(
 ) -> User:
     """Create a user in 'invited' state and email them an accept link."""
     from app.models.role import Role
+    from app.services.billing_service import check_usage_limit
 
+    check_usage_limit(db, organization_id, "users")
     existing = db.execute(
         select(User).where(User.email == email.lower())
     ).scalar_one_or_none()

@@ -132,6 +132,7 @@ class CheckoutCreate(BaseModel):
     address: str | None = Field(default=None, max_length=300)
     discount: Decimal = Field(default=Decimal("0"), ge=0)
     tax: Decimal = Field(default=Decimal("0"), ge=0)
+    shipping_method_id: UUID | None = None
     coupon_code: str | None = Field(default=None, max_length=50)
     items: list[CheckoutItem] = Field(min_length=1)
 
@@ -154,6 +155,11 @@ class StorefrontInfo(BaseModel):
     currency: str = "USD"
     timezone: str = "UTC"
     logo_url: str | None = None
+    favicon_url: str | None = None
+    primary_color: str | None = None
+    secondary_color: str | None = None
+    description: str | None = None
+    social_links: dict | None = None
 
 
 class CatalogParams(PageParams):

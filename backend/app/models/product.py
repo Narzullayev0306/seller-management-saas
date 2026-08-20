@@ -25,6 +25,7 @@ from app.models.storefront import (
 )
 
 if TYPE_CHECKING:
+    from app.models.category import Category
     from app.models.inventory import InventoryMovement
     from app.models.order import OrderItem
     from app.models.product_variant import ProductVariant
@@ -50,6 +51,9 @@ class Product(TimestampMixin, Base):
     brand_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("brands.id", ondelete="SET NULL"), index=True, nullable=True
     )
+    category_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL"), index=True, nullable=True
+    )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     sku: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -65,6 +69,7 @@ class Product(TimestampMixin, Base):
     order_items: Mapped[list[OrderItem]] = relationship(back_populates="product")
     movements: Mapped[list[InventoryMovement]] = relationship(back_populates="product")
     brand: Mapped[Brand | None] = relationship(back_populates="products")
+    category_rel: Mapped[Category | None] = relationship(back_populates="products")
     images: Mapped[list[ProductImage]] = relationship(
         back_populates="product", cascade="all, delete-orphan"
     )

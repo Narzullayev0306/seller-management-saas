@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.ratelimit import check_rate_limit
+from app.core.ratelimit import check_rate_limit, client_ip, client_user_agent
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
@@ -46,7 +46,13 @@ def register(
     db: Session = Depends(get_db),
 ) -> TokenPair:
     check_rate_limit(request, "register", limit=10, window=60)
-    _, tokens = auth_service.register(db, payload, background_tasks)
+    _, tokens = auth_service.register(
+        db,
+        payload,
+        background_tasks,
+        created_ip=client_ip(request),
+        user_agent=client_user_agent(request),
+    )
     return tokens
 
 
@@ -62,7 +68,13 @@ def register(
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> TokenPair:
     check_rate_limit(request, "login", limit=10, window=60)
     check_rate_limit(request, f"login_email:{payload.email.lower()}", limit=10, window=300)
-    _, tokens = auth_service.login(db, payload.email, payload.password)
+    _, tokens = auth_service.login(
+        db,
+        payload.email,
+        payload.password,
+        created_ip=client_ip(request),
+        user_agent=client_user_agent(request),
+    )
     return tokens
 
 
@@ -73,8 +85,17 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     description="Revokes the presented refresh token and issues a new pair.",
     responses={401: {"description": "Invalid, expired or revoked token"}},
 )
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair:
-    return auth_service.refresh(db, payload.refresh_token)
+def refresh(
+    payload: RefreshRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> TokenPair:
+    return auth_service.refresh(
+        db,
+        payload.refresh_token,
+        created_ip=client_ip(request),
+        user_agent=client_user_agent(request),
+    )
 
 
 @router.post(
@@ -126,6 +147,54 @@ def memberships(
     db: Session = Depends(get_db),
 ) -> list[dict]:
     return auth_service.list_memberships(db, user)
+
+
+@router.get(
+    "/sessions",
+    summary="List active sessions (devices) for the current user",
+    description="Active refresh-token sessions with device/browser metadata and "
+    "IP address. Used by the 'Active Sessions' security panel.",
+)
+def sessions(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    return auth_service.list_sessions(db, user)
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=204,
+    summary="Revoke a specific session",
+    description="Logs out one device/browser. The caller may only revoke their "
+    "own sessions.",
+)
+def revoke_session(
+    session_id: UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    auth_service.revoke_session(db, user, session_id)
+
+
+class RevokeOthersRequest(BaseModel):
+    current_session_id: UUID
+
+
+@router.post(
+    "/sessions/revoke-others",
+    status_code=200,
+    summary="Revoke all sessions except the current one",
+    description="Signs out every other device/browser while keeping the caller "
+    "signed in on the session they provide.",
+)
+def revoke_other_sessions(
+    payload: RevokeOthersRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    revoked = auth_service.revoke_other_sessions(db, user, payload.current_session_id)
+    return {"revoked": revoked}
 
 
 @router.post(

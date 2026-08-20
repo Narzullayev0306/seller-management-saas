@@ -22,6 +22,7 @@ import type {
 const CUSTOMER_ACCESS_KEY = "sms_customer_access";
 const CUSTOMER_REFRESH_KEY = "sms_customer_refresh";
 const CART_TOKEN_KEY = "sms_cart_token";
+const WISHLIST_TOKEN_KEY = "sms_wishlist_token";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
@@ -53,10 +54,28 @@ export function getCartToken(): string {
   return token;
 }
 
+export function getWishlistToken(): string {
+  if (typeof window === "undefined") return "";
+  let token = localStorage.getItem(WISHLIST_TOKEN_KEY);
+  if (!token) {
+    token = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(WISHLIST_TOKEN_KEY, token);
+  }
+  return token;
+}
+
 /** Headers identifying the shopper: customer JWT when logged in, else guest cart token. */
 export function cartHeaders(): Record<string, string> {
   const { access } = getCustomerTokens();
   const headers: Record<string, string> = { "X-Cart-Token": getCartToken() };
+  if (access) headers.Authorization = `Bearer ${access}`;
+  return headers;
+}
+
+/** Headers for wishlist endpoints: customer JWT or guest wishlist token. */
+export function wishlistHeaders(): Record<string, string> {
+  const { access } = getCustomerTokens();
+  const headers: Record<string, string> = { "X-Wishlist-Token": getWishlistToken() };
   if (access) headers.Authorization = `Bearer ${access}`;
   return headers;
 }
@@ -89,6 +108,7 @@ export async function customerRequest<T>(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...cartHeaders(),
+    ...wishlistHeaders(),
     ...options.headers,
   };
   if (access) headers.Authorization = `Bearer ${access}`;

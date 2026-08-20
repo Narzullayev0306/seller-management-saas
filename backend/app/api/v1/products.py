@@ -8,6 +8,7 @@ from app.api.deps import require_permissions
 from app.core.exceptions import bad_request
 from app.core.redis import cache_invalidate
 from app.db.session import get_db
+from app.models.category import Category
 from app.models.inventory import InventoryMovement
 from app.models.product import Product
 from app.models.product_variant import ProductVariant
@@ -41,6 +42,30 @@ def _ensure_brand(db: Session, organization_id: UUID, brand_id: UUID | None) -> 
         raise bad_request("BRAND_NOT_FOUND", "Brand does not exist in this organization")
 
 
+def _ensure_category(
+    db: Session, organization_id: UUID, category_id: UUID | None
+) -> str | None:
+    """Validate the category belongs to the org; returns its name."""
+    if category_id is None:
+        return None
+    category = db.execute(
+        select(Category).where(
+            Category.organization_id == organization_id, Category.id == category_id
+        )
+    ).scalar_one_or_none()
+    if category is None:
+        raise bad_request(
+            "CATEGORY_NOT_FOUND", "Category does not exist in this organization"
+        )
+    return category.name
+
+
+def _category_name(payload: ProductCreate | ProductUpdate, org_name: str | None) -> str | None:
+    if org_name is not None:
+        return org_name
+    return getattr(payload, "category", None)
+
+
 def _to_read(product: Product) -> ProductRead:
     return ProductRead(
         id=product.id,
@@ -56,6 +81,7 @@ def _to_read(product: Product) -> ProductRead:
         stock_status=product.stock_status,
         image_url=product.image_url,
         brand_id=product.brand_id,
+        category_id=product.category_id,
         featured=product.featured,
         variants=[
             ProductVariantRead(
@@ -190,6 +216,9 @@ def create_product(
     db: Session = Depends(get_db),
     actor: User = Depends(require_permissions("products.create")),
 ) -> ProductRead:
+    from app.services.billing_service import check_usage_limit
+
+    check_usage_limit(db, actor.effective_organization_id, "products")
     repo = ProductRepository(db)
     existing = db.execute(
         select(Product).where(
@@ -201,13 +230,17 @@ def create_product(
         raise bad_request("SKU_TAKEN", "A product with this SKU already exists")
     _ensure_brand(db, actor.effective_organization_id, payload.brand_id)
     _ensure_variant_skus(db, actor.effective_organization_id, payload.variants)
+    category_name = _ensure_category(
+        db, actor.effective_organization_id, payload.category_id
+    )
 
     product = repo.create(
         actor.effective_organization_id,
         name=payload.name,
         sku=payload.sku,
         description=payload.description,
-        category=payload.category,
+        category=_category_name(payload, category_name),
+        category_id=payload.category_id,
         price=payload.price,
         cost_price=payload.cost_price,
         stock_quantity=payload.stock_quantity,
@@ -267,6 +300,11 @@ def update_product(
     data = payload.model_dump(exclude_none=True, exclude={"variants"})
     if "brand_id" in data:
         _ensure_brand(db, actor.effective_organization_id, data["brand_id"])
+    if "category_id" in data:
+        category_name = _ensure_category(
+            db, actor.effective_organization_id, data["category_id"]
+        )
+        data["category"] = category_name
 
     if "sku" in data:
         existing = db.execute(

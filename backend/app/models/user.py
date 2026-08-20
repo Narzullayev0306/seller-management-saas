@@ -11,6 +11,7 @@ from app.db.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from app.models.auth_token import AuthToken
     from app.models.notification import Notification
+    from app.models.notification_preference import NotificationPreference
     from app.models.organization import Organization
     from app.models.organization_member import OrganizationMember
     from app.models.refresh_token import RefreshToken
@@ -50,4 +51,7 @@ class User(TimestampMixin, Base):
     )
     notifications: Mapped[list[Notification]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
+    )
+    notification_preference: Mapped[NotificationPreference | None] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
     )
