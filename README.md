@@ -284,9 +284,15 @@ CI runs the full matrix on every push: ruff + pip-audit + pytest (against a real
 | [docs/PHASES.md](docs/PHASES.md) | Build roadmap and progress |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment guide |
 
+## Live demo
+
+**App:** https://seller-saas-web.vercel.app · **API:** https://seller-saas-api.vercel.app/docs
+
+Sign in with the Owner demo account (`owner@techmart.uz` / `DemoPass123!`) — the database is seeded with 100 products, 100 customers and 240 orders across 6 months. You can also browse the public [storefront](https://seller-saas-web.vercel.app/storefront) without an account.
+
 ## Roadmap
 
-- [ ] Hosted live demo with seeded data
+- [x] Hosted live demo with seeded data
 - [ ] E2E browser tests (register → login → product → checkout → dashboard)
 - [ ] Observability: structured request IDs, error tracking, metrics
 - [ ] Release tags & changelog
