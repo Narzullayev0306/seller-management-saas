@@ -20,8 +20,10 @@ interface TopProduct {
   revenue: number;
 }
 
+type ReportPeriod = "7d" | "30d" | "this_month" | "year";
+
 export default function DashboardReportsPage() {
-  const [period, setPeriod] = useState<"7d" | "30d" | "this_month" | "year">("30d");
+  const [period, setPeriod] = useState<ReportPeriod>("30d");
   const [loading, setLoading] = useState(false);
 
   // Mock aggregated report data for demonstration
@@ -47,7 +49,7 @@ export default function DashboardReportsPage() {
     async function loadBackendData() {
       setLoading(true);
       try {
-        const res = await api.get<{ items?: any[] }>("/orders?page_size=100");
+        const res = await api.get<{ items?: { total?: number | string }[] }>("/orders?page_size=100");
         if (res?.items && res.items.length > 0) {
           // Calculate dynamically from actual orders if available
           const totalOrders = res.items.length;
@@ -101,7 +103,7 @@ export default function DashboardReportsPage() {
           <div className="flex items-center gap-2">
             <select
               value={period}
-              onChange={(e) => setPeriod(e.target.value as any)}
+              onChange={(e) => setPeriod(e.target.value as ReportPeriod)}
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
             >
               <option value="7d">Last 7 Days</option>

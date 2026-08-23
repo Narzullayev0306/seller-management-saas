@@ -64,14 +64,22 @@ export function QuickViewModal({ product, onClose }: QuickViewModalProps) {
   const [bisEmail, setBisEmail] = useState("");
   const [bisStatus, setBisStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
 
-  useEffect(() => {
-    if (!product) return;
-    pushRecentlyViewed(product.id, product);
+  // Reset per-product UI state when a different product is opened
+  // (adjust-state-on-prop-change pattern; setState during render is allowed here).
+  const [syncedProductId, setSyncedProductId] = useState<string | null>(null);
+  if ((product?.id ?? null) !== syncedProductId) {
+    setSyncedProductId(product?.id ?? null);
+    setDetail(null);
     setActiveImageIndex(0);
     setQuantity(1);
     setActiveTab("details");
     setBisStatus("idle");
     setBisEmail("");
+  }
+
+  useEffect(() => {
+    if (!product) return;
+    pushRecentlyViewed(product.id, product);
 
     let cancelled = false;
     sfPath(`/products/${product.id}`).then((path) =>
