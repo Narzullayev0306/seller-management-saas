@@ -185,7 +185,6 @@ def seed(if_empty: bool = False) -> None:
             ("manager@techmart.uz", "Jasur Aliyev", "manager", "ManagerPass123!"),
             ("seller@techmart.uz", "Farrux Nazarov", "seller", "SellerPass123!"),
             ("viewer@techmart.uz", "Zebo Qodirova", "viewer", "ViewerPass123!"),
-            ("narzullayevislom21@gmail.com", "Islom Narzullayev", "admin", "Knyaz202"),
         ]:
             user = User(
                 organization_id=org.id,
@@ -416,7 +415,8 @@ def seed(if_empty: bool = False) -> None:
                 order_service.delete_order(org.id, order.id, owner_user.id)
                 _backdate(db, Order, order.id, created)
             elif status == "delivered":
-                order_service.update_status(org.id, order.id, "delivered", owner_user.id)
+                for step in ("confirmed", "processing", "shipped", "delivered"):
+                    order_service.update_status(org.id, order.id, step, owner_user.id)
                 _backdate(db, Order, order.id, created)
                 _backdate(db, Sale, order.sale.id if order.sale else None, created)
             else:
@@ -435,7 +435,6 @@ def seed(if_empty: bool = False) -> None:
         print("  manager: manager@techmart.uz / ManagerPass123!")
         print("  seller:  seller@techmart.uz / SellerPass123!")
         print("  viewer:  viewer@techmart.uz / ViewerPass123!")
-        print("  admin:   narzullayevislom21@gmail.com / Knyaz202")
     finally:
         db.close()
 
