@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, Suspense } from "react";
+import { useState, Suspense } from "react";
 
 import { formatMoney } from "@/lib/format";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
-  const orderNumber = searchParams?.get("order") || "ORD-" + Math.floor(100000 + Math.random() * 900000);
+  // Lazy initializer: generated once per mount instead of on every render.
+  const [fallbackOrderNumber] = useState(
+    () => "ORD-" + Math.floor(100000 + Math.random() * 900000),
+  );
+  const orderNumber = searchParams?.get("order") || fallbackOrderNumber;
   const total = searchParams?.get("total") || "149.00";
 
   return (
