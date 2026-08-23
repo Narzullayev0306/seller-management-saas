@@ -50,22 +50,21 @@ export default function CategoriesPage() {
     window.setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const fetchTree = useCallback(() => {
-    setLoading(true);
-    api
-      .get<CategoryTreeNode[]>("/categories/tree")
-      .then((data) => {
-        setTree(data);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : "Failed to load categories");
-      })
-      .finally(() => setLoading(false));
+  const fetchTree = useCallback(async () => {
+    try {
+      const data = await api.get<CategoryTreeNode[]>("/categories/tree");
+      setTree(data);
+      setError(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load categories");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    fetchTree();
+    const t = setTimeout(() => void fetchTree(), 0);
+    return () => clearTimeout(t);
   }, [fetchTree]);
 
   const flatten = (nodes: CategoryTreeNode[]): Category[] => {
