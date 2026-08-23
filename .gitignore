@@ -27,3 +27,4 @@ Thumbs.db
 *.log
 coverage/
 htmlcov/
+.env.supabase
