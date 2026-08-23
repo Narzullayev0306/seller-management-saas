@@ -39,6 +39,8 @@ PERMISSIONS: dict[str, str] = {
     "coupons.delete": "Delete coupons",
     "settings.read": "View company settings",
     "settings.update": "Update company settings",
+    "billing.read": "View plan, usage and invoices",
+    "billing.manage": "Change the billing plan",
 }
 
 SYSTEM_ROLE_PERMISSIONS: dict[str, list[str]] = {

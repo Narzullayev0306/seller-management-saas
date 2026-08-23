@@ -1,0 +1,41 @@
+# Production reverse proxy + TLS for Seller Management SaaS.
+# Used by docker-compose.prod.yml (caddy service).
+#
+#   DOMAIN=app.example.com docker compose -f docker-compose.prod.yml up -d caddy
+#
+# Without DOMAIN set, Caddy binds plain HTTP only (local/staging use).
+
+{
+	# Keep frontend/backend container names resolvable
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+{$DOMAIN:http://localhost} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
+	# API routes -> FastAPI backend
+	handle /api/* {
+		reverse_proxy {$BACKEND_URL:http://backend:8000}
+	}
+
+	# Everything else -> Next.js frontend
+	handle {
+		reverse_proxy {$FRONTEND_URL:http://frontend:3000}
+	}
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}

@@ -7,15 +7,54 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.exceptions import forbidden, unauthorized
+from app.core.exceptions import ApiError, forbidden, unauthorized
 from app.core.security import decode_access_token
 from app.db.session import get_db
+from app.models.api_key import ApiKey
+from app.models.customer_account import CustomerAccount
 from app.models.organization import Organization
 from app.models.organization_member import OrganizationMember
 from app.models.role import Role, user_roles
 from app.models.user import User
+from app.services.api_key_service import verify_api_key
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def get_current_customer(
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> CustomerAccount:
+    """Resolve the storefront customer account from a customer-kind JWT."""
+    if credentials is None:
+        raise unauthorized()
+    payload = decode_access_token(credentials.credentials)
+    if payload.get("kind") != "customer":
+        raise unauthorized("INVALID_TOKEN", "Invalid access token")
+    account = db.execute(
+        select(CustomerAccount).where(
+            CustomerAccount.id == payload["sub"],
+        )
+    ).scalar_one_or_none()
+    if account is None or not account.is_active:
+        raise unauthorized("INVALID_TOKEN", "Invalid access token")
+    org = db.get(Organization, account.organization_id)
+    if org is None or not org.is_active:
+        raise unauthorized("ORG_INACTIVE", "This company is no longer active")
+    return account
+
+
+def optional_current_customer(
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> CustomerAccount | None:
+    """Like get_current_customer, but returns None for missing/invalid tokens."""
+    if credentials is None:
+        return None
+    try:
+        return get_current_customer(db, credentials)
+    except ApiError:
+        return None
 
 
 def get_current_user(
@@ -25,6 +64,8 @@ def get_current_user(
     if credentials is None:
         raise unauthorized()
     payload = decode_access_token(credentials.credentials)
+    if payload.get("kind", "user") != "user":
+        raise unauthorized("INVALID_TOKEN", "Invalid access token")
     user = db.execute(
         select(User).where(User.id == payload["sub"])
     ).scalar_one_or_none()
@@ -94,5 +135,34 @@ def require_permissions(*required: str):
                 f"Missing permission(s): {', '.join(sorted(missing))}",
             )
         return user
+
+    return dependency
+
+
+def require_api_key_scopes(*required: str):
+    """Authenticate via `Authorization: Bearer smk_...` and enforce scopes.
+
+    The returned ApiKey carries `effective_organization_id` so endpoints can
+    scope queries exactly like user-based endpoints.
+    """
+
+    def dependency(
+        db: Session = Depends(get_db),
+        credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    ) -> ApiKey:
+        if credentials is None or not credentials.credentials.startswith("smk_"):
+            raise unauthorized("API_KEY_REQUIRED", "An API key is required")
+        key = verify_api_key(db, credentials.credentials)
+        if key is None:
+            raise unauthorized("INVALID_API_KEY", "Invalid or expired API key")
+        granted = set(key.scopes)
+        missing = set(required) - granted
+        if missing:
+            raise forbidden(
+                "API_KEY_SCOPE_DENIED",
+                f"API key is missing scope(s): {', '.join(sorted(missing))}",
+            )
+        key.effective_organization_id = key.organization_id
+        return key
 
     return dependency

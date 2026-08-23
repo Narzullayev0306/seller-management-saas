@@ -10,7 +10,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.customer_account import CustomerAccount
     from app.models.order import Order
+    from app.models.wishlist import Wishlist
 
 
 class Customer(TimestampMixin, Base):
@@ -41,6 +43,10 @@ class Customer(TimestampMixin, Base):
     )
 
     orders: Mapped[list[Order]] = relationship(back_populates="customer")
+    wishlists: Mapped[list[Wishlist]] = relationship(back_populates="customer")
+    account: Mapped[CustomerAccount | None] = relationship(
+        back_populates="customer", uselist=False
+    )
 
     @property
     def full_name(self) -> str:

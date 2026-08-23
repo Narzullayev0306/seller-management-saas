@@ -44,7 +44,8 @@ def get_my_organization(
     "/me",
     response_model=OrganizationRead,
     summary="Update the caller's company settings",
-    description="Updates name, logo, currency, timezone, address, phone and email.",
+    description="Updates name, logo, favicon, brand colors, description, social "
+    "links, currency, timezone, address, phone and email.",
 )
 def update_my_organization(
     payload: OrganizationUpdate,

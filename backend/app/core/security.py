@@ -22,11 +22,14 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(user_id: UUID, organization_id: UUID) -> str:
+def create_access_token(
+    user_id: UUID, organization_id: UUID, kind: str = "user"
+) -> str:
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
         "org": str(organization_id),
+        "kind": kind,
         "type": "access",
         "iat": now,
         "exp": now + timedelta(minutes=settings.jwt_access_token_expire_minutes),

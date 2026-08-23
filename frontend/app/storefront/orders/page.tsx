@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { useAuth } from "@/lib/auth";
-import { api } from "@/lib/api-client";
+import { useCustomerAuth, customerRequest } from "@/lib/customer-auth";
+import { sfPath } from "@/lib/storefront-slug";
 import { formatMoney } from "@/lib/format";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -41,7 +41,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; s
 };
 
 export default function StorefrontOrdersPage() {
-  const { user } = useAuth();
+  const { customer } = useCustomerAuth();
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
@@ -51,13 +51,13 @@ export default function StorefrontOrdersPage() {
     async function loadOrders() {
       setLoading(true);
       try {
-        // Try fetching orders from API if logged in, or fallback to saved localStorage orders
         const localSaved = JSON.parse(localStorage.getItem("sms_storefront_orders") || "[]");
-        if (user) {
+        if (customer) {
           try {
-            const res = await api.get<{ items: OrderRecord[] }>("/orders?page_size=50");
-            if (res?.items) {
-              const combined = [...res.items];
+            const path = await sfPath("/auth/orders");
+            const res = await customerRequest<OrderRecord[]>(path);
+            if (Array.isArray(res)) {
+              const combined = [...res];
               // Merge any local orders not yet on server
               localSaved.forEach((lo: OrderRecord) => {
                 if (!combined.some((co) => co.id === lo.id || co.order_number === lo.order_number)) {
@@ -82,7 +82,7 @@ export default function StorefrontOrdersPage() {
       }
     }
     void loadOrders();
-  }, [user]);
+  }, [customer]);
 
   const filteredOrders = orders.filter((o) => {
     if (!searchQuery.trim()) return true;

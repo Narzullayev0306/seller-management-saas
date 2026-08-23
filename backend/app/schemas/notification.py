@@ -23,3 +23,19 @@ class NotificationListParams(BaseModel):
 
 class UnreadCount(BaseModel):
     count: int
+
+
+class NotificationPreferenceRead(BaseModel):
+    in_app_enabled: bool
+    email_enabled: bool
+    new_order_alerts: bool
+    low_stock_alerts: bool
+    marketing_emails: bool
+
+
+class NotificationPreferenceUpdate(BaseModel):
+    in_app_enabled: bool | None = None
+    email_enabled: bool | None = None
+    new_order_alerts: bool | None = None
+    low_stock_alerts: bool | None = None
+    marketing_emails: bool | None = None

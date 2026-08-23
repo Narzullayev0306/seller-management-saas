@@ -136,6 +136,9 @@ def create_order(
     db: Session = Depends(get_db),
     actor: User = Depends(require_permissions("orders.create")),
 ) -> JSONResponse | OrderRead:
+    from app.services.billing_service import check_usage_limit
+
+    check_usage_limit(db, actor.effective_organization_id, "orders_per_month")
     seller = _linked_seller(db, actor)
     if "seller" in user_role_codes(actor):
         if seller is None:

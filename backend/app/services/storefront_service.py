@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request, not_found
 from app.models.customer import Customer
+from app.models.customer_account import CustomerAccount
 from app.models.organization import Organization
 from app.models.product import Product
+from app.models.shipping_method import ShippingMethod
 from app.models.storefront import (
     BackInStockRequest,
     Brand,
@@ -351,17 +353,49 @@ class StorefrontService:
 
     # ---- checkout ---------------------------------------------------------
 
-    def checkout(self, payload: CheckoutCreate) -> CheckoutResult:
+    def checkout(
+        self,
+        payload: CheckoutCreate,
+        customer_account: CustomerAccount | None = None,
+    ) -> CheckoutResult:
         org_id = self.organization_id
-        customer = self._find_customer(org_id, payload.email)
-        if customer is None:
-            customer = self._create_customer(org_id, payload)
+        if customer_account is not None:
+            customer = self.db.get(Customer, customer_account.customer_id)
+            if customer is None:
+                raise bad_request(
+                    "CUSTOMER_MISSING", "Linked customer record not found"
+                )
+            customer.first_name = payload.first_name
+            customer.last_name = payload.last_name
+            customer.phone = payload.phone
+            customer.address = payload.address
+        else:
+            customer = self._find_customer(org_id, payload.email)
+            if customer is None:
+                customer = self._create_customer(org_id, payload)
+
+        shipping_fee = Decimal("0")
+        if payload.shipping_method_id is not None:
+            method = self.db.execute(
+                select(ShippingMethod).where(
+                    ShippingMethod.organization_id == org_id,
+                    ShippingMethod.id == payload.shipping_method_id,
+                    ShippingMethod.is_active.is_(True),
+                )
+            ).scalar_one_or_none()
+            if method is None:
+                raise bad_request(
+                    "SHIPPING_METHOD_NOT_FOUND",
+                    "Shipping method does not exist or is inactive",
+                )
+            shipping_fee = method.price
 
         order_create = OrderCreate(
             seller_id=None,
             customer_id=customer.id,
             discount=payload.discount,
             tax=payload.tax,
+            shipping_fee=shipping_fee,
             coupon_code=payload.coupon_code,
             items=[
                 OrderItemInput(

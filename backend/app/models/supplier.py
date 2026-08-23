@@ -10,6 +10,7 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.organization import Organization
+    from app.models.purchase_order import PurchaseOrder
 
 
 class Supplier(TimestampMixin, Base):
@@ -26,3 +27,6 @@ class Supplier(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
 
     organization: Mapped[Organization] = relationship(back_populates="suppliers")
+    purchase_orders: Mapped[list[PurchaseOrder]] = relationship(
+        back_populates="supplier"
+    )

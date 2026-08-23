@@ -33,6 +33,26 @@ services:
       retries: 10
     restart: unless-stopped
 
+  migrate:
+    build:
+      context: ./backend
+    container_name: sms-migrate
+    environment:
+      DATABASE_URL: postgresql+psycopg://seller:seller_dev_password@postgres:5432/seller_management
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: alembic upgrade head
+    restart: "no"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
   backend:
     build:
       context: ./backend
@@ -60,14 +80,20 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   worker:
     build:
@@ -94,6 +120,14 @@ services:
         condition: service_healthy
     command: python -m app.worker
     restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   frontend:
     build:

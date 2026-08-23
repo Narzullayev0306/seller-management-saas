@@ -21,6 +21,23 @@ services:
     volumes:
       - redisdata:/data
 
+  migrate:
+    build:
+      context: ./backend
+    container_name: sms-prod-migrate
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    command: alembic upgrade head
+    restart: "no"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
   backend:
     build:
       context: ./backend
@@ -43,15 +60,56 @@ services:
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
     ports:
       - "8000:8000"
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     command: >
-      sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4"
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
     restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  worker:
+    build:
+      context: ./backend
+    container_name: sms-prod-worker
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      REDIS_ENABLED: ${REDIS_ENABLED:-true}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@example.com}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    command: python -m app.worker
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   frontend:
     build:
@@ -59,14 +117,39 @@ services:
       dockerfile: Dockerfile.prod
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
     container_name: sms-prod-frontend
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ORG: ${SENTRY_ORG:-}
+      SENTRY_PROJECT: ${SENTRY_PROJECT:-}
     ports:
       - "3000:3000"
     depends_on:
       - backend
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: sms-prod-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://frontend:3000}
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
 volumes:
   redisdata:
+  caddydata:
+  caddyconfig:

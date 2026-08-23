@@ -43,6 +43,7 @@ class ProductBase(BaseModel):
     status: str = Field(default="active", pattern="^(active|inactive)$")
     image_url: str | None = Field(default=None, max_length=500)
     brand_id: UUID | None = None
+    category_id: UUID | None = None
     featured: bool = False
     variants: list[ProductVariantInput] = Field(default_factory=list)
 
@@ -65,6 +66,7 @@ class ProductUpdate(BaseModel):
     status: str | None = Field(default=None, pattern="^(active|inactive)$")
     image_url: str | None = Field(default=None, max_length=500)
     brand_id: UUID | None = None
+    category_id: UUID | None = None
     featured: bool | None = None
     variants: list[ProductVariantInput] | None = None
 
@@ -85,6 +87,7 @@ class ProductRead(BaseModel):
     stock_status: str
     image_url: str | None = None
     brand_id: UUID | None = None
+    category_id: UUID | None = None
     featured: bool = False
     variants: list[ProductVariantRead] = Field(default_factory=list)
     created_at: datetime

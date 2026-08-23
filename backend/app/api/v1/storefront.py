@@ -5,14 +5,32 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_customer, optional_current_customer
 from app.core.exceptions import bad_request
 from app.core.ratelimit import check_rate_limit
 from app.core.redis import cache_get, cache_invalidate, cache_set
 from app.db.session import get_db
+from app.models.customer_account import CustomerAccount
+from app.models.order import Order
 from app.models.organization import Organization
+from app.models.shipping_method import ShippingMethod
+from app.schemas.cart import CartItemInput, CartItemUpdate, CartRead
 from app.schemas.common import build_page
+from app.schemas.customer_auth import (
+    CustomerLoginRequest,
+    CustomerLogoutRequest,
+    CustomerMe,
+    CustomerProfileUpdate,
+    CustomerRefreshRequest,
+    CustomerRegisterRequest,
+    CustomerTokenPair,
+)
+from app.schemas.order import OrderRead
+from app.schemas.refund import ReturnRequestCreate, ReturnRequestRead
+from app.schemas.shipping_method import StorefrontShippingMethod
 from app.schemas.storefront import (
     BackInStockCreate,
     BrandWithCount,
@@ -26,6 +44,8 @@ from app.schemas.storefront import (
     ReviewRead,
     StorefrontInfo,
 )
+from app.schemas.wishlist import WishlistItemCreate, WishlistRead
+from app.services import cart_service, customer_auth_service, refund_service, wishlist_service
 from app.services.idempotency_service import (
     claim_idempotency_key,
     store_response,
@@ -91,13 +111,63 @@ def _idempotent_checkout(
                 return JSONResponse(content=body, status_code=status)
             raise bad_request(
                 "IDEMPOTENCY_IN_PROGRESS",
-                "This request is still being processed, please retry shortly",
+"This request is still being processed, please retry shortly",
             )
         result = run_checkout()
         body = result.model_dump(mode="json")
         store_response(org_id, idem_key, status_code, body)
         return JSONResponse(content=body, status_code=status_code)
     return run_checkout()
+
+
+def _clear_cart_after_checkout(
+    db: Session,
+    org_id: UUID,
+    account: CustomerAccount | None,
+    request: Request,
+) -> None:
+    """Remove the shopper's cart once their order has been placed."""
+    if account is not None:
+        cart = cart_service.find_customer_cart(db, org_id, account.customer_id)
+    else:
+        cart = cart_service.find_session_cart(
+            db, org_id, request.headers.get("X-Cart-Token")
+        )
+    if cart is not None:
+        cart_service.clear(db, cart)
+
+
+def _customer_order_read(order: Order) -> OrderRead:
+    return OrderRead(
+        id=order.id,
+        order_number=order.order_number,
+        seller_id=order.seller_id,
+        seller_name=order.seller.full_name if order.seller else None,
+        customer_id=order.customer_id,
+        customer_name=order.customer.full_name if order.customer else "",
+        created_by=order.created_by,
+        created_by_name=order.creator.full_name if order.creator else None,
+        status=order.status,
+        payment_status=order.payment_status,
+        subtotal=order.subtotal,
+        discount=order.discount,
+        tax=order.tax,
+        shipping_fee=order.shipping_fee,
+        total=order.total,
+        items=[
+            {
+                "id": item.id,
+                "product_id": item.product_id,
+                "product_variant_id": item.product_variant_id,
+                "product_name": item.product.name if item.product else "",
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "subtotal": item.subtotal,
+            }
+            for item in order.items
+        ],
+        created_at=order.created_at,
+    )
 
 
 def _make_slug_routes() -> APIRouter:
@@ -162,6 +232,73 @@ def _make_slug_routes() -> APIRouter:
     def categories(slug: str, db: Session = Depends(get_db)) -> list[CategoryWithCount]:
         return StorefrontService(db, resolve_storefront(db, slug)).categories()
 
+    @router.get(
+        "/shipping-methods",
+        response_model=list[StorefrontShippingMethod],
+        summary="Active shipping methods for a store",
+    )
+    def shipping_methods(
+        slug: str, db: Session = Depends(get_db)
+    ) -> list[StorefrontShippingMethod]:
+        org_id = resolve_storefront(db, slug)
+        methods = db.execute(
+            select(ShippingMethod)
+            .where(
+                ShippingMethod.organization_id == org_id,
+                ShippingMethod.is_active.is_(True),
+            )
+            .order_by(ShippingMethod.sort_order, ShippingMethod.name)
+        ).scalars()
+        return [StorefrontShippingMethod.model_validate(m) for m in methods]
+
+    @router.get(
+        "/returns",
+        response_model=list[ReturnRequestRead],
+        summary="List the signed-in customer's return requests",
+    )
+    def customer_returns(
+        slug: str,
+        account: CustomerAccount = Depends(get_current_customer),
+        db: Session = Depends(get_db),
+    ) -> list[ReturnRequestRead]:
+        org_id = resolve_storefront(db, slug)
+        return [
+            refund_service.return_read(r)
+            for r in refund_service.list_customer_returns(
+                db, org_id, account.customer_id
+            )
+        ]
+
+    @router.post(
+        "/returns",
+        response_model=ReturnRequestRead,
+        status_code=201,
+        summary="Request a return for an order item",
+        description="Only shipped/delivered orders are eligible; the total "
+        "returned quantity per item cannot exceed the purchased quantity.",
+    )
+    def customer_request_return(
+        slug: str,
+        order_id: UUID,
+        payload: ReturnRequestCreate,
+        request: Request,
+        account: CustomerAccount = Depends(get_current_customer),
+        db: Session = Depends(get_db),
+    ) -> ReturnRequestRead:
+        check_rate_limit(request, "return_create", limit=10, window=60)
+        org_id = resolve_storefront(db, slug)
+        result = refund_service.request_return(
+            db,
+            org_id,
+            account,
+            order_id,
+            payload.order_item_id,
+            payload.quantity,
+            payload.reason,
+            payload.condition,
+        )
+        return refund_service.return_read(result)
+
     @router.post(
         "/products/{product_id}/reviews",
         response_model=ReviewRead,
@@ -204,7 +341,9 @@ def _make_slug_routes() -> APIRouter:
         summary="Guest checkout",
         description="Creates (or finds) the customer and places an order: stock is "
         "reserved and movements recorded exactly like the admin flow. Supports an "
-        "optional Idempotency-Key header to prevent duplicate orders.",
+        "optional Idempotency-Key header to prevent duplicate orders. When a "
+        "customer Bearer token is provided, the order is linked to that account "
+        "and the customer's cart is cleared.",
         responses={
             404: {"description": "Product or storefront not found"},
             409: {"description": "Insufficient stock"},
@@ -214,19 +353,365 @@ def _make_slug_routes() -> APIRouter:
         slug: str,
         payload: CheckoutCreate,
         request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
         db: Session = Depends(get_db),
 ) -> JSONResponse | CheckoutResult:
         check_rate_limit(request, "checkout", limit=5, window=60)
         org_id = resolve_storefront(db, slug)
+        from app.services.billing_service import check_usage_limit
+
+        check_usage_limit(db, org_id, "orders_per_month")
 
         def _run() -> CheckoutResult:
-            result = StorefrontService(db, org_id).checkout(payload)
+            result = StorefrontService(db, org_id).checkout(
+                payload, customer_account=account
+            )
             invalidate_catalog_cache(org_id)
+            _clear_cart_after_checkout(db, org_id, account, request)
             return result
 
         return _idempotent_checkout(
             org_id, request.headers.get("Idempotency-Key"), _run
         )
+
+    # ---- customer accounts ----------------------------------------------
+
+    @router.post(
+        "/auth/register",
+        response_model=CustomerTokenPair,
+        status_code=201,
+        summary="Register a customer account for this store",
+        responses={
+            409: {"description": "Email already registered"},
+            422: {"description": "Validation error"},
+        },
+    )
+    def auth_register(
+        slug: str,
+        payload: CustomerRegisterRequest,
+        request: Request,
+        db: Session = Depends(get_db),
+    ) -> CustomerTokenPair:
+        check_rate_limit(request, "customer_register", limit=5, window=60)
+        org_id = resolve_storefront(db, slug)
+        return customer_auth_service.register(db, org_id, payload)
+
+    @router.post(
+        "/auth/login",
+        response_model=CustomerTokenPair,
+        summary="Login with a customer account for this store",
+        responses={401: {"description": "Invalid credentials"}},
+    )
+    def auth_login(
+        slug: str,
+        payload: CustomerLoginRequest,
+        request: Request,
+        db: Session = Depends(get_db),
+    ) -> CustomerTokenPair:
+        check_rate_limit(request, "customer_login", limit=10, window=60)
+        check_rate_limit(
+            request,
+            f"customer_login_email:{payload.email.lower()}",
+            limit=10,
+            window=300,
+        )
+        org_id = resolve_storefront(db, slug)
+        return customer_auth_service.login(db, org_id, payload)
+
+    @router.post(
+        "/auth/refresh",
+        response_model=CustomerTokenPair,
+        summary="Rotate a customer refresh token",
+        responses={401: {"description": "Invalid, expired or revoked token"}},
+    )
+    def auth_refresh(
+        slug: str,
+        payload: CustomerRefreshRequest,
+        db: Session = Depends(get_db),
+    ) -> CustomerTokenPair:
+        resolve_storefront(db, slug)
+        return customer_auth_service.refresh(db, payload.refresh_token)
+
+    @router.post(
+        "/auth/logout",
+        status_code=204,
+        summary="Logout a customer account",
+        description="Revokes the presented refresh token. Idempotent.",
+    )
+    def auth_logout(
+        slug: str,
+        payload: CustomerLogoutRequest,
+        db: Session = Depends(get_db),
+    ) -> None:
+        resolve_storefront(db, slug)
+        customer_auth_service.logout(db, payload.refresh_token)
+
+    @router.get(
+        "/auth/me",
+        response_model=CustomerMe,
+        summary="Current customer account profile",
+    )
+    def auth_me(
+        slug: str,
+        account: CustomerAccount = Depends(get_current_customer),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        org_id = resolve_storefront(db, slug)
+        if account.organization_id != org_id:
+            raise bad_request(
+                "WRONG_STORE", "This account belongs to another store"
+            )
+        return customer_auth_service.account_payload(db, account)
+
+    @router.patch(
+        "/auth/me",
+        response_model=CustomerMe,
+        summary="Update the current customer account profile",
+    )
+    def auth_update_me(
+        slug: str,
+        payload: CustomerProfileUpdate,
+        account: CustomerAccount = Depends(get_current_customer),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        org_id = resolve_storefront(db, slug)
+        if account.organization_id != org_id:
+            raise bad_request(
+                "WRONG_STORE", "This account belongs to another store"
+            )
+        return customer_auth_service.update_profile(db, account, payload)
+
+    @router.get(
+        "/auth/orders",
+        response_model=list[OrderRead],
+        summary="Orders placed by the current customer account",
+    )
+    def auth_orders(
+        slug: str,
+        account: CustomerAccount = Depends(get_current_customer),
+        db: Session = Depends(get_db),
+    ) -> list[OrderRead]:
+        org_id = resolve_storefront(db, slug)
+        if account.organization_id != org_id:
+            raise bad_request(
+                "WRONG_STORE", "This account belongs to another store"
+            )
+        orders = db.execute(
+            select(Order)
+            .where(
+                Order.organization_id == org_id,
+                Order.customer_id == account.customer_id,
+            )
+            .order_by(Order.created_at.desc())
+            .limit(50)
+        ).scalars().all()
+        return [_customer_order_read(o) for o in orders]
+
+    # ---- cart ------------------------------------------------------------
+
+    @router.get(
+        "/cart",
+        response_model=CartRead,
+        summary="Read the current cart",
+        description="Identified by a customer Bearer token or an X-Cart-Token "
+        "header (client-generated anonymous session token).",
+    )
+    def cart_get(
+        slug: str,
+        request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
+        db: Session = Depends(get_db),
+    ) -> CartRead:
+        org_id = resolve_storefront(db, slug)
+        customer, session_token = cart_service.resolve_cart_owner(
+            db, org_id, account, request.headers.get("X-Cart-Token")
+        )
+        cart = cart_service.get_or_create_cart(
+            db, org_id, customer=customer, session_token=session_token
+        )
+        return cart_service.cart_read(db, org_id, cart)
+
+    @router.post(
+        "/cart/items",
+        response_model=CartRead,
+        status_code=201,
+        summary="Add an item to the cart",
+        responses={404: {"description": "Product not found"}},
+    )
+    def cart_add_item(
+        slug: str,
+        payload: CartItemInput,
+        request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
+        db: Session = Depends(get_db),
+    ) -> CartRead:
+        check_rate_limit(request, "cart_add", limit=30, window=60)
+        org_id = resolve_storefront(db, slug)
+        customer, session_token = cart_service.resolve_cart_owner(
+            db, org_id, account, request.headers.get("X-Cart-Token")
+        )
+        cart = cart_service.get_or_create_cart(
+            db, org_id, customer=customer, session_token=session_token
+        )
+        return cart_service.add_item(db, org_id, cart, payload)
+
+    @router.patch(
+        "/cart/items/{item_id}",
+        response_model=CartRead,
+        summary="Update an item quantity",
+        responses={404: {"description": "Cart item not found"}},
+    )
+    def cart_update_item(
+        slug: str,
+        item_id: UUID,
+        payload: CartItemUpdate,
+        request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
+        db: Session = Depends(get_db),
+    ) -> CartRead:
+        org_id = resolve_storefront(db, slug)
+        customer, session_token = cart_service.resolve_cart_owner(
+            db, org_id, account, request.headers.get("X-Cart-Token")
+        )
+        cart = cart_service.get_or_create_cart(
+            db, org_id, customer=customer, session_token=session_token
+        )
+        return cart_service.update_item(db, org_id, cart, item_id, payload.quantity)
+
+    @router.delete(
+        "/cart/items/{item_id}",
+        response_model=CartRead,
+        summary="Remove an item from the cart",
+        responses={404: {"description": "Cart item not found"}},
+    )
+    def cart_remove_item(
+        slug: str,
+        item_id: UUID,
+        request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
+        db: Session = Depends(get_db),
+    ) -> CartRead:
+        org_id = resolve_storefront(db, slug)
+        customer, session_token = cart_service.resolve_cart_owner(
+            db, org_id, account, request.headers.get("X-Cart-Token")
+        )
+        cart = cart_service.get_or_create_cart(
+            db, org_id, customer=customer, session_token=session_token
+        )
+        return cart_service.remove_item(db, cart, item_id)
+
+    @router.delete(
+        "/cart",
+        response_model=CartRead,
+        summary="Clear the cart",
+    )
+    def cart_clear(
+        slug: str,
+        request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
+        db: Session = Depends(get_db),
+    ) -> CartRead:
+        org_id = resolve_storefront(db, slug)
+        customer, session_token = cart_service.resolve_cart_owner(
+            db, org_id, account, request.headers.get("X-Cart-Token")
+        )
+        cart = cart_service.get_or_create_cart(
+            db, org_id, customer=customer, session_token=session_token
+        )
+        return cart_service.clear(db, cart)
+
+    # ---- wishlist --------------------------------------------------------
+
+    @router.get(
+        "/wishlist",
+        response_model=WishlistRead,
+        summary="Read the wishlist",
+        description="Identified by a customer Bearer token or an X-Wishlist-Token "
+        "header (client-generated anonymous session token).",
+    )
+    def wishlist_get(
+        slug: str,
+        request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
+        db: Session = Depends(get_db),
+    ) -> WishlistRead:
+        org_id = resolve_storefront(db, slug)
+        customer, session_token = wishlist_service.resolve_wishlist_owner(
+            db, org_id, account, request.headers.get("X-Wishlist-Token")
+        )
+        wishlist = wishlist_service.get_or_create_wishlist(
+            db, org_id, customer=customer, session_token=session_token
+        )
+        return wishlist_service.wishlist_read(db, org_id, wishlist)
+
+    @router.post(
+        "/wishlist/items",
+        response_model=WishlistRead,
+        status_code=201,
+        summary="Add an item to the wishlist",
+        description="Idempotent: adding an already-wishlisted product is a no-op.",
+        responses={404: {"description": "Product not found"}},
+    )
+    def wishlist_add_item(
+        slug: str,
+        payload: WishlistItemCreate,
+        request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
+        db: Session = Depends(get_db),
+    ) -> WishlistRead:
+        check_rate_limit(request, "wishlist_add", limit=30, window=60)
+        org_id = resolve_storefront(db, slug)
+        customer, session_token = wishlist_service.resolve_wishlist_owner(
+            db, org_id, account, request.headers.get("X-Wishlist-Token")
+        )
+        wishlist = wishlist_service.get_or_create_wishlist(
+            db, org_id, customer=customer, session_token=session_token
+        )
+        return wishlist_service.add_item(
+            db, org_id, wishlist, payload.product_id, payload.product_variant_id
+        )
+
+    @router.delete(
+        "/wishlist/items/{item_id}",
+        response_model=WishlistRead,
+        summary="Remove an item from the wishlist",
+        responses={404: {"description": "Wishlist item not found"}},
+    )
+    def wishlist_remove_item(
+        slug: str,
+        item_id: UUID,
+        request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
+        db: Session = Depends(get_db),
+    ) -> WishlistRead:
+        org_id = resolve_storefront(db, slug)
+        customer, session_token = wishlist_service.resolve_wishlist_owner(
+            db, org_id, account, request.headers.get("X-Wishlist-Token")
+        )
+        wishlist = wishlist_service.get_or_create_wishlist(
+            db, org_id, customer=customer, session_token=session_token
+        )
+        return wishlist_service.remove_item(db, wishlist, item_id)
+
+    @router.delete(
+        "/wishlist",
+        response_model=WishlistRead,
+        summary="Clear the wishlist",
+    )
+    def wishlist_clear(
+        slug: str,
+        request: Request,
+        account: CustomerAccount | None = Depends(optional_current_customer),
+        db: Session = Depends(get_db),
+    ) -> WishlistRead:
+        org_id = resolve_storefront(db, slug)
+        customer, session_token = wishlist_service.resolve_wishlist_owner(
+            db, org_id, account, request.headers.get("X-Wishlist-Token")
+        )
+        wishlist = wishlist_service.get_or_create_wishlist(
+            db, org_id, customer=customer, session_token=session_token
+        )
+        return wishlist_service.clear(db, wishlist)
 
     return router
 
@@ -245,6 +730,11 @@ def _storefront_info(db: Session, org_id: UUID) -> StorefrontInfo:
         currency=org.currency or "USD",
         timezone=org.timezone or "UTC",
         logo_url=org.logo_url,
+        favicon_url=org.favicon_url,
+        primary_color=org.primary_color,
+        secondary_color=org.secondary_color,
+        description=org.description,
+        social_links=org.social_links,
     )
 
 
@@ -307,6 +797,70 @@ def legacy_categories(db: Session = Depends(get_db)) -> list[CategoryWithCount]:
     return StorefrontService(db, resolve_storefront(db, None)).categories()
 
 
+@legacy_router.get(
+    "/shipping-methods",
+    response_model=list[StorefrontShippingMethod],
+    summary="Active shipping methods (default store)",
+)
+def legacy_shipping_methods(
+    db: Session = Depends(get_db),
+) -> list[StorefrontShippingMethod]:
+    org_id = resolve_storefront(db, None)
+    methods = db.execute(
+        select(ShippingMethod)
+        .where(
+            ShippingMethod.organization_id == org_id,
+            ShippingMethod.is_active.is_(True),
+        )
+        .order_by(ShippingMethod.sort_order, ShippingMethod.name)
+    ).scalars()
+    return [StorefrontShippingMethod.model_validate(m) for m in methods]
+
+
+@legacy_router.get(
+    "/returns",
+    response_model=list[ReturnRequestRead],
+    summary="List the signed-in customer's return requests (default store)",
+)
+def legacy_customer_returns(
+    account: CustomerAccount = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> list[ReturnRequestRead]:
+    org_id = resolve_storefront(db, None)
+    return [
+        refund_service.return_read(r)
+        for r in refund_service.list_customer_returns(db, org_id, account.customer_id)
+    ]
+
+
+@legacy_router.post(
+    "/returns",
+    response_model=ReturnRequestRead,
+    status_code=201,
+    summary="Request a return for an order item (default store)",
+)
+def legacy_customer_request_return(
+    order_id: UUID,
+    payload: ReturnRequestCreate,
+    request: Request,
+    account: CustomerAccount = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> ReturnRequestRead:
+    check_rate_limit(request, "return_create", limit=10, window=60)
+    org_id = resolve_storefront(db, None)
+    result = refund_service.request_return(
+        db,
+        org_id,
+        account,
+        order_id,
+        payload.order_item_id,
+        payload.quantity,
+        payload.reason,
+        payload.condition,
+    )
+    return refund_service.return_read(result)
+
+
 @legacy_router.post(
     "/products/{product_id}/reviews",
     response_model=ReviewRead,
@@ -351,17 +905,337 @@ def legacy_back_in_stock(
 def legacy_checkout(
     payload: CheckoutCreate,
     request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
     db: Session = Depends(get_db),
 ) -> JSONResponse | CheckoutResult:
     check_rate_limit(request, "checkout", limit=5, window=60)
     org_id = resolve_storefront(db, None)
+    from app.services.billing_service import check_usage_limit
+
+    check_usage_limit(db, org_id, "orders_per_month")
 
     def _run() -> CheckoutResult:
-        result = StorefrontService(db, org_id).checkout(payload)
+        result = StorefrontService(db, org_id).checkout(
+            payload, customer_account=account
+        )
         invalidate_catalog_cache(org_id)
+        _clear_cart_after_checkout(db, org_id, account, request)
         return result
 
     return _idempotent_checkout(org_id, request.headers.get("Idempotency-Key"), _run)
+
+
+# ---- legacy customer account + cart routes (default store) -------------
+
+
+@legacy_router.post(
+    "/auth/register",
+    response_model=CustomerTokenPair,
+    status_code=201,
+    summary="Register a customer account (default store)",
+)
+def legacy_auth_register(
+    payload: CustomerRegisterRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> CustomerTokenPair:
+    check_rate_limit(request, "customer_register", limit=5, window=60)
+    org_id = resolve_storefront(db, None)
+    return customer_auth_service.register(db, org_id, payload)
+
+
+@legacy_router.post(
+    "/auth/login",
+    response_model=CustomerTokenPair,
+    summary="Login with a customer account (default store)",
+)
+def legacy_auth_login(
+    payload: CustomerLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> CustomerTokenPair:
+    check_rate_limit(request, "customer_login", limit=10, window=60)
+    check_rate_limit(
+        request,
+        f"customer_login_email:{payload.email.lower()}",
+        limit=10,
+        window=300,
+    )
+    org_id = resolve_storefront(db, None)
+    return customer_auth_service.login(db, org_id, payload)
+
+
+@legacy_router.post(
+    "/auth/refresh",
+    response_model=CustomerTokenPair,
+    summary="Rotate a customer refresh token (default store)",
+)
+def legacy_auth_refresh(
+    payload: CustomerRefreshRequest,
+    db: Session = Depends(get_db),
+) -> CustomerTokenPair:
+    resolve_storefront(db, None)
+    return customer_auth_service.refresh(db, payload.refresh_token)
+
+
+@legacy_router.post(
+    "/auth/logout",
+    status_code=204,
+    summary="Logout a customer account (default store)",
+)
+def legacy_auth_logout(
+    payload: CustomerLogoutRequest,
+    db: Session = Depends(get_db),
+) -> None:
+    resolve_storefront(db, None)
+    customer_auth_service.logout(db, payload.refresh_token)
+
+
+@legacy_router.get(
+    "/auth/me",
+    response_model=CustomerMe,
+    summary="Current customer account profile (default store)",
+)
+def legacy_auth_me(
+    account: CustomerAccount = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> dict:
+    org_id = resolve_storefront(db, None)
+    if account.organization_id != org_id:
+        raise bad_request("WRONG_STORE", "This account belongs to another store")
+    return customer_auth_service.account_payload(db, account)
+
+
+@legacy_router.patch(
+    "/auth/me",
+    response_model=CustomerMe,
+    summary="Update the current customer account profile (default store)",
+)
+def legacy_auth_update_me(
+    payload: CustomerProfileUpdate,
+    account: CustomerAccount = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> dict:
+    org_id = resolve_storefront(db, None)
+    if account.organization_id != org_id:
+        raise bad_request("WRONG_STORE", "This account belongs to another store")
+    return customer_auth_service.update_profile(db, account, payload)
+
+
+@legacy_router.get(
+    "/auth/orders",
+    response_model=list[OrderRead],
+    summary="Orders placed by the current customer account (default store)",
+)
+def legacy_auth_orders(
+    account: CustomerAccount = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+) -> list[OrderRead]:
+    org_id = resolve_storefront(db, None)
+    if account.organization_id != org_id:
+        raise bad_request("WRONG_STORE", "This account belongs to another store")
+    orders = db.execute(
+        select(Order)
+        .where(
+            Order.organization_id == org_id,
+            Order.customer_id == account.customer_id,
+        )
+        .order_by(Order.created_at.desc())
+        .limit(50)
+    ).scalars().all()
+    return [_customer_order_read(o) for o in orders]
+
+
+@legacy_router.get(
+    "/cart",
+    response_model=CartRead,
+    summary="Read the current cart (default store)",
+)
+def legacy_cart_get(
+    request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
+    db: Session = Depends(get_db),
+) -> CartRead:
+    org_id = resolve_storefront(db, None)
+    customer, session_token = cart_service.resolve_cart_owner(
+        db, org_id, account, request.headers.get("X-Cart-Token")
+    )
+    cart = cart_service.get_or_create_cart(
+        db, org_id, customer=customer, session_token=session_token
+    )
+    return cart_service.cart_read(db, org_id, cart)
+
+
+@legacy_router.post(
+    "/cart/items",
+    response_model=CartRead,
+    status_code=201,
+    summary="Add an item to the cart (default store)",
+)
+def legacy_cart_add_item(
+    payload: CartItemInput,
+    request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
+    db: Session = Depends(get_db),
+) -> CartRead:
+    check_rate_limit(request, "cart_add", limit=30, window=60)
+    org_id = resolve_storefront(db, None)
+    customer, session_token = cart_service.resolve_cart_owner(
+        db, org_id, account, request.headers.get("X-Cart-Token")
+    )
+    cart = cart_service.get_or_create_cart(
+        db, org_id, customer=customer, session_token=session_token
+    )
+    return cart_service.add_item(db, org_id, cart, payload)
+
+
+@legacy_router.patch(
+    "/cart/items/{item_id}",
+    response_model=CartRead,
+    summary="Update an item quantity (default store)",
+)
+def legacy_cart_update_item(
+    item_id: UUID,
+    payload: CartItemUpdate,
+    request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
+    db: Session = Depends(get_db),
+) -> CartRead:
+    org_id = resolve_storefront(db, None)
+    customer, session_token = cart_service.resolve_cart_owner(
+        db, org_id, account, request.headers.get("X-Cart-Token")
+    )
+    cart = cart_service.get_or_create_cart(
+        db, org_id, customer=customer, session_token=session_token
+    )
+    return cart_service.update_item(db, org_id, cart, item_id, payload.quantity)
+
+
+@legacy_router.delete(
+    "/cart/items/{item_id}",
+    response_model=CartRead,
+    summary="Remove an item from the cart (default store)",
+)
+def legacy_cart_remove_item(
+    item_id: UUID,
+    request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
+    db: Session = Depends(get_db),
+) -> CartRead:
+    org_id = resolve_storefront(db, None)
+    customer, session_token = cart_service.resolve_cart_owner(
+        db, org_id, account, request.headers.get("X-Cart-Token")
+    )
+    cart = cart_service.get_or_create_cart(
+        db, org_id, customer=customer, session_token=session_token
+    )
+    return cart_service.remove_item(db, cart, item_id)
+
+
+@legacy_router.delete(
+    "/cart",
+    response_model=CartRead,
+    summary="Clear the cart (default store)",
+)
+def legacy_cart_clear(
+    request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
+    db: Session = Depends(get_db),
+) -> CartRead:
+    org_id = resolve_storefront(db, None)
+    customer, session_token = cart_service.resolve_cart_owner(
+        db, org_id, account, request.headers.get("X-Cart-Token")
+    )
+    cart = cart_service.get_or_create_cart(
+        db, org_id, customer=customer, session_token=session_token
+    )
+    return cart_service.clear(db, cart)
+
+
+@legacy_router.get(
+    "/wishlist",
+    response_model=WishlistRead,
+    summary="Read the wishlist (default store)",
+)
+def legacy_wishlist_get(
+    request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
+    db: Session = Depends(get_db),
+) -> WishlistRead:
+    org_id = resolve_storefront(db, None)
+    customer, session_token = wishlist_service.resolve_wishlist_owner(
+        db, org_id, account, request.headers.get("X-Wishlist-Token")
+    )
+    wishlist = wishlist_service.get_or_create_wishlist(
+        db, org_id, customer=customer, session_token=session_token
+    )
+    return wishlist_service.wishlist_read(db, org_id, wishlist)
+
+
+@legacy_router.post(
+    "/wishlist/items",
+    response_model=WishlistRead,
+    status_code=201,
+    summary="Add an item to the wishlist (default store)",
+)
+def legacy_wishlist_add_item(
+    payload: WishlistItemCreate,
+    request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
+    db: Session = Depends(get_db),
+) -> WishlistRead:
+    check_rate_limit(request, "wishlist_add", limit=30, window=60)
+    org_id = resolve_storefront(db, None)
+    customer, session_token = wishlist_service.resolve_wishlist_owner(
+        db, org_id, account, request.headers.get("X-Wishlist-Token")
+    )
+    wishlist = wishlist_service.get_or_create_wishlist(
+        db, org_id, customer=customer, session_token=session_token
+    )
+    return wishlist_service.add_item(
+        db, org_id, wishlist, payload.product_id, payload.product_variant_id
+    )
+
+
+@legacy_router.delete(
+    "/wishlist/items/{item_id}",
+    response_model=WishlistRead,
+    summary="Remove an item from the wishlist (default store)",
+)
+def legacy_wishlist_remove_item(
+    item_id: UUID,
+    request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
+    db: Session = Depends(get_db),
+) -> WishlistRead:
+    org_id = resolve_storefront(db, None)
+    customer, session_token = wishlist_service.resolve_wishlist_owner(
+        db, org_id, account, request.headers.get("X-Wishlist-Token")
+    )
+    wishlist = wishlist_service.get_or_create_wishlist(
+        db, org_id, customer=customer, session_token=session_token
+    )
+    return wishlist_service.remove_item(db, wishlist, item_id)
+
+
+@legacy_router.delete(
+    "/wishlist",
+    response_model=WishlistRead,
+    summary="Clear the wishlist (default store)",
+)
+def legacy_wishlist_clear(
+    request: Request,
+    account: CustomerAccount | None = Depends(optional_current_customer),
+    db: Session = Depends(get_db),
+) -> WishlistRead:
+    org_id = resolve_storefront(db, None)
+    customer, session_token = wishlist_service.resolve_wishlist_owner(
+        db, org_id, account, request.headers.get("X-Wishlist-Token")
+    )
+    wishlist = wishlist_service.get_or_create_wishlist(
+        db, org_id, customer=customer, session_token=session_token
+    )
+    return wishlist_service.clear(db, wishlist)
 
 
 router = _make_slug_routes()
