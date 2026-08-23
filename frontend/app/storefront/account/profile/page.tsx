@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useAuth } from "@/lib/auth";
-import { api } from "@/lib/api-client";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface SavedAddress {
@@ -41,12 +40,14 @@ export default function CustomerProfilePage() {
   const [newLabel, setNewLabel] = useState("Work");
   const [showAddressForm, setShowAddressForm] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      setFullName(user.full_name);
-      setEmail(user.email);
-    }
-  }, [user]);
+  // Re-sync form fields when the auth context delivers/changes the user
+  // (adjust-state-on-prop-change pattern; setState during render is allowed here).
+  const [syncedUser, setSyncedUser] = useState(user);
+  if (user !== syncedUser) {
+    setSyncedUser(user);
+    setFullName(user?.full_name ?? "");
+    setEmail(user?.email ?? "");
+  }
 
   function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();

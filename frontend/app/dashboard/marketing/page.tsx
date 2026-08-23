@@ -55,7 +55,7 @@ export default function DashboardMarketingPage() {
 
   const [showModal, setShowModal] = useState(false);
   const [code, setCode] = useState("");
-  const [type, setType] = useState<"percentage" | "fixed">("percentage");
+  const [type, setType] = useState<Coupon["type"]>("percentage");
   const [value, setValue] = useState(15);
   const [minOrder, setMinOrder] = useState(50);
   const [usageLimit, setUsageLimit] = useState(100);
@@ -208,7 +208,7 @@ export default function DashboardMarketingPage() {
                   </label>
                   <select
                     value={type}
-                    onChange={(e) => setType(e.target.value as any)}
+                    onChange={(e) => setType(e.target.value as Coupon["type"])}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                   >
                     <option value="percentage">Percentage (%)</option>

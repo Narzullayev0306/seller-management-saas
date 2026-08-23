@@ -12,11 +12,15 @@ import os
 os.environ["APP_ENV"] = "test"
 os.environ["JWT_ACCESS_TOKEN_EXPIRE_MINUTES"] = "60"
 os.environ["REDIS_ENABLED"] = "false"
-os.environ[
-    "DATABASE_URL"
-] = "postgresql+psycopg://seller:seller_dev_password@postgres:5432/seller_management_test"
 
+# Point whatever DATABASE_URL is provided (docker service, CI localhost, custom)
+# at the dedicated test database instead of assuming the docker hostname.
+_BASE_DB_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg://seller:seller_dev_password@postgres:5432/seller_management",
+)
 TEST_DB_NAME = "seller_management_test"
+os.environ["DATABASE_URL"] = _BASE_DB_URL.rsplit("/", 1)[0] + "/" + TEST_DB_NAME
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
