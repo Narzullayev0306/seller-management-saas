@@ -97,12 +97,12 @@ def register(
     )
     db.add(user)
     db.flush()
-    customer_role = db.execute(
+    owner_role = db.execute(
         select(Role).where(
-            Role.organization_id == org.id, Role.code == RoleCode.CUSTOMER
+            Role.organization_id == org.id, Role.code == RoleCode.OWNER
         )
     ).scalar_one()
-    user.roles.append(customer_role)
+    user.roles.append(owner_role)
     db.add(OrganizationMember(organization_id=org.id, user_id=user.id))
     db.flush()
 

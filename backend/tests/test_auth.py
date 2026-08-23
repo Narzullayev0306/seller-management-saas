@@ -20,7 +20,7 @@ async def test_register_returns_tokens(client):
 
 
 @pytest.mark.asyncio
-async def test_register_creates_customer_role(client):
+async def test_register_creates_owner_role(client):
     resp = await client.post(
         "/api/v1/auth/register",
         json={
@@ -36,12 +36,12 @@ async def test_register_creates_customer_role(client):
     )
     assert me.status_code == 200
     body = me.json()
-    assert [r["code"] for r in body["roles"]] == ["customer"]
-    assert body["permissions"] == []
+    assert [r["code"] for r in body["roles"]] == ["owner"]
+    assert len(body["permissions"]) > 0
 
 
 @pytest.mark.asyncio
-async def test_customer_role_is_not_admin(client):
+async def test_owner_can_access_admin_routes(client):
     resp = await client.post(
         "/api/v1/auth/register",
         json={
@@ -55,12 +55,12 @@ async def test_customer_role_is_not_admin(client):
         "/api/v1/users",
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert users.status_code == 403
+    assert users.status_code == 200
     dash = await client.get(
         "/api/v1/analytics/dashboard",
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert dash.status_code == 403
+    assert dash.status_code == 200
 
 
 @pytest.mark.asyncio

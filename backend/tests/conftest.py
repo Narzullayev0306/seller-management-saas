@@ -110,20 +110,6 @@ async def register_org(client: AsyncClient, suffix: str = "") -> dict:
     assert resp.status_code == 201, resp.text
     data = resp.json()
     email = f"owner{suffix}@test.io".lower()
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                """
-                INSERT INTO user_roles (id, user_id, role_id)
-                SELECT gen_random_uuid(), u.id, r.id
-                FROM users u
-                JOIN organizations o ON o.id = u.organization_id
-                JOIN roles r ON r.organization_id = o.id AND r.code = 'owner'
-                WHERE u.email = :email
-                """
-            ),
-            {"email": email},
-        )
     return {
         "access_token": data["access_token"],
         "refresh_token": data["refresh_token"],
