@@ -81,6 +81,29 @@ Backups). For the self-hosted path, back up the Postgres database:
 docker compose -f docker-compose.prod.yml exec backend pg_dump "$DATABASE_URL" -Fc > backup.dump
 ```
 
+### Backup schedule
+
+- **Daily logical dump** (cron example, keep 7 days):
+  `0 3 * * * docker compose -f docker-compose.prod.yml exec backend pg_dump "$DATABASE_URL" -Fc > /backups/db-$(date +\%F).dump`
+- **Off-site copies**: sync `/backups` to object storage
+  (`aws s3 sync /backups s3://your-bucket/backups --only-show-errors`).
+- **Test restores quarterly** — a backup that has never been restored is not a backup.
+
+### Restore
+
+```bash
+# full restore into a fresh database
+docker compose -f docker-compose.prod.yml exec -T backend pg_restore \
+  --clean --if-exists --no-owner -d "$DATABASE_URL" < backup.dump
+```
+
+Steps for a disaster recovery:
+
+1. Stop writes: `docker compose -f docker-compose.prod.yml stop backend worker`.
+2. Drop and recreate the database (or provision a fresh one).
+3. Run `alembic upgrade head`, then `pg_restore` the latest dump.
+4. Start services back up and verify `GET /api/health/ready` returns `ok`.
+
 ## 7. Operations
 
 - Health check: `GET /health` on the backend.
