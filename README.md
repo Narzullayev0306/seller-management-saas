@@ -13,12 +13,19 @@
 
 [Documentation](docs/) · [API Reference](docs/API.md) · [Architecture](docs/ARCHITECTURE.md) · [Database ERD](docs/ERD.md) · [Deployment](DEPLOYMENT.md)
 
-<!-- TODO: add real product screenshots here (dashboard, products, orders, storefront, mobile) once captured.
 <p align="center">
-  <img src="docs/assets/dashboard.png" alt="Dashboard" width="49%">
-  <img src="docs/assets/storefront.png" alt="Storefront" width="49%">
+  <img src="docs/assets/dashboard.png" alt="Analytics dashboard" width="49%">
+  <img src="docs/assets/storefront.png" alt="Customer storefront" width="49%">
 </p>
--->
+<p align="center">
+  <img src="docs/assets/products.png" alt="Product catalog" width="49%">
+  <img src="docs/assets/orders.png" alt="Order pipeline" width="49%">
+</p>
+<p align="center">
+  <img src="docs/assets/mobile-dashboard.png" alt="Mobile dashboard" width="32%">
+  <img src="docs/assets/reports.png" alt="Sales reports" width="49%">
+  <img src="docs/assets/mobile-login.png" alt="Mobile login" width="32%">
+</p>
 
 ## Why this project is different
 
