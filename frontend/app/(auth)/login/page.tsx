@@ -50,9 +50,6 @@ export default function LoginPage() {
     <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
       <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Sign in to your account</h2>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        Admin: narzullayevislom21@gmail.com / Knyaz202
-      </p>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
         Demo: owner@techmart.uz / DemoPass123!
       </p>
 
