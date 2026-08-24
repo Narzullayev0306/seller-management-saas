@@ -27,7 +27,7 @@ First public release: a multi-tenant inventory & sales management SaaS
   security-header middleware, optional Sentry instrumentation.
 - **Auth**: JWT access/refresh rotation with refresh-token families,
   organization signup creates the first owner automatically.
-- **Testing**: 222 backend pytest tests, frontend typecheck/lint, Playwright
+- **Testing**: 228 backend pytest tests, frontend typecheck/lint, Playwright
   E2E suite (auth, products, orders, storefront), CodeQL static analysis.
 - **Deployment**: Docker Compose dev/prod stacks with Redis-backed Celery
   workers, Vercel deployment path (serverless entrypoint `backend/api/index.py`),

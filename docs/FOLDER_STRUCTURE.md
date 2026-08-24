@@ -1,165 +1,94 @@
 # Folder Structure
 
+Monorepo with two applications (`backend/`, `frontend/`), an E2E suite
+(`e2e/`) and infrastructure/config at the root.
+
 ```
 seller-management-saas/
-├── README.md
-├── .env.example
-├── docker-compose.yml
+├── README.md · CHANGELOG.md · DEPLOYMENT.md · LICENSE
+├── .env.example              # template — real secrets never committed
+├── docker-compose.yml        # dev stack: postgres, redis, migrate, backend,
+│                             # worker, frontend
+├── docker-compose.prod.yml   # prod stack (+ caddy reverse proxy)
+├── deploy/Caddyfile          # TLS termination / proxy rules
+├── .github/workflows/        # ci.yml · e2e.yml · security.yml (CodeQL)
 │
 ├── backend/
-│   ├── Dockerfile
-│   ├── pyproject.toml
-│   ├── alembic.ini
-│   ├── alembic/
-│   │   ├── env.py
-│   │   └── versions/
+│   ├── Dockerfile · pyproject.toml · alembic.ini
+│   ├── api/index.py          # Vercel serverless entrypoint
+│   ├── alembic/versions/     # 20 revisions (schema → ... → categories)
 │   ├── app/
-│   │   ├── main.py                  # app factory, CORS, exception handlers, router mount
+│   │   ├── main.py           # app factory, CORS, middleware, error handlers,
+│   │   │                     # health endpoints, Sentry (optional)
 │   │   ├── api/
-│   │   │   ├── router.py            # aggregates all v1 routers
-│   │   │   ├── deps.py              # get_db, get_current_user, require_permissions
-│   │   │   └── v1/
-│   │   │       ├── auth.py
-│   │   │       ├── users.py
-│   │   │       ├── sellers.py
-│   │   │       ├── products.py
-│   │   │       ├── customers.py
-│   │   │       ├── orders.py
-│   │   │       ├── inventory.py
-│   │   │       ├── analytics.py
-│   │   │       └── audit_logs.py
-│   │   ├── core/
-│   │   │   ├── config.py            # pydantic-settings (env)
-│   │   │   ├── security.py          # bcrypt, JWT create/decode
-│   │   │   └── exceptions.py        # domain errors + error codes
-│   │   ├── db/
-│   │   │   ├── base.py              # DeclarativeBase + naming convention
-│   │   │   ├── session.py           # engine, sessionmaker, get_db
-│   │   │   └── seed.py              # demo seed data (CLI entry)
-│   │   ├── models/                  # SQLAlchemy 2.0 mapped classes
-│   │   │   ├── organization.py
-│   │   │   ├── user.py
-│   │   │   ├── role.py
-│   │   │   ├── permission.py
-│   │   │   ├── seller.py
-│   │   │   ├── product.py
-│   │   │   ├── customer.py
-│   │   │   ├── order.py
-│   │   │   ├── inventory.py
-│   │   │   ├── sale.py
-│   │   │   └── audit_log.py
-│   │   ├── repositories/            # org-scoped data access
-│   │   │   ├── base.py              # org-scoped query helpers + pagination
-│   │   │   ├── user_repo.py
-│   │   │   ├── seller_repo.py
-│   │   │   ├── product_repo.py
-│   │   │   ├── customer_repo.py
-│   │   │   ├── order_repo.py
-│   │   │   ├── inventory_repo.py
-│   │   │   └── analytics_repo.py
-│   │   ├── schemas/                 # Pydantic v2
-│   │   │   ├── common.py            # Page, error envelope, sort/filter params
-│   │   │   ├── auth.py
-│   │   │   ├── user.py
-│   │   │   ├── seller.py
-│   │   │   ├── product.py
-│   │   │   ├── customer.py
-│   │   │   ├── order.py
-│   │   │   ├── inventory.py
-│   │   │   ├── analytics.py
-│   │   │   └── audit.py
-│   │   ├── services/
-│   │   │   ├── auth_service.py      # register/login/refresh/logout
-│   │   │   ├── order_service.py     # transactional order lifecycle
-│   │   │   ├── inventory_service.py # movements, adjustments
-│   │   │   ├── analytics_service.py # summary + series
-│   │   │   ├── audit_service.py     # log action helper
-│   │   │   └── rbac_service.py      # permission resolution
-│   │   └── utils/
-│   │       └── datetime.py          # UTC helpers
-│   └── tests/
-│       ├── conftest.py              # test DB (postgres), fixtures, factories
-│       ├── test_auth.py
-│       ├── test_rbac.py
-│       ├── test_org_isolation.py
-│       ├── test_products.py
-│       ├── test_sellers.py
-│       ├── test_customers.py
-│       ├── test_orders.py
-│       ├── test_inventory.py
-│       ├── test_analytics.py
-│       ├── test_validation.py
-│       └── test_pagination.py
+│   │   │   ├── router.py     # aggregates all v1 routers under /api/v1
+│   │   │   ├── deps.py       # get_db, get_current_user, require_permissions,
+│   │   │   │                 # require_owner, api-key auth
+│   │   │   └── v1/           # 24 routers + public_api:
+│   │   │       # auth, users, roles, sellers, products, categories, customers,
+│   │   │       # orders, inventory, analytics, audit_logs, storefront,
+│   │   │       # uploads, notifications, organizations, suppliers, coupons,
+│   │   │       # shipping_methods, refunds, purchase_orders, webhooks,
+│   │   │       # api_keys, billing, domains
+│   │   ├── core/             # config, security (bcrypt/JWT), exceptions,
+│   │   │                     # middleware (request-id, security headers),
+│   │   │                     # ratelimit, redis client
+│   │   ├── db/               # session, base, seed CLI (python -m app.db.seed)
+│   │   ├── models/           # 33 SQLAlchemy models: organization, user, role,
+│   │   │                     # seller, product, product_variant, category,
+│   │   │                     # customer(_account), order, payment, refund,
+│   │   │                     # inventory, purchase_order, supplier, sale,
+│   │   │                     # coupon, shipping_method, cart, wishlist,
+│   │   │                     # notification(_preference), webhook, api_key,
+│   │   │                     # billing, domain, outbox, idempotency,
+│   │   │                     # refresh_token, auth_token, audit_log, ...
+│   │   ├── repositories/     # org-scoped data access; base.py forces the
+│   │   │                     # organization_id filter on every query
+│   │   ├── schemas/          # Pydantic v2 request/response models
+│   │   └── services/         # business logic: order_service +
+│   │                         # order_state_machine, inventory, payment(+_providers),
+│   │                         # coupon, cart, wishlist, storefront,
+│   │                         # customer_auth, category, purchase_order,
+│   │                         # refund, shipping/domain/billing/webhook/api_key,
+│   │                         # notification(+preferences), email, storage,
+│   │                         # outbox, idempotency, permissions/rbac,
+│   │                         # auth_token (sessions), audit
+│   ├── app/worker.py         # python -m app.worker — outbox dispatcher
+│   └── tests/                # pytest suite — 228 tests incl. isolation & RBAC
 │
 ├── frontend/
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── next.config.ts
-│   ├── tailwind.config.ts
-│   ├── tsconfig.json
-│   ├── components.json              # shadcn/ui config
-│   ├── public/
+│   ├── Dockerfile · Dockerfile.prod · next.config.ts · proxy.ts
+│   ├── instrumentation*.ts · sentry.server.config.ts   # optional Sentry
 │   ├── app/
-│   │   ├── layout.tsx               # root layout + providers
-│   │   ├── globals.css
-│   │   ├── (auth)/
-│   │   │   ├── login/page.tsx
-│   │   │   └── register/page.tsx
-│   │   └── (dashboard)/
-│   │       ├── layout.tsx           # sidebar + topbar shell
-│   │       ├── page.tsx             # redirect → /dashboard
-│   │       ├── dashboard/page.tsx
-│   │       ├── sellers/page.tsx
-│   │       ├── sellers/[id]/page.tsx
-│   │       ├── products/page.tsx
-│   │       ├── products/[id]/page.tsx
-│   │       ├── customers/page.tsx
-│   │       ├── customers/[id]/page.tsx
-│   │       ├── orders/page.tsx
-│   │       ├── orders/[id]/page.tsx
-│   │       ├── inventory/page.tsx
-│   │       ├── analytics/page.tsx
-│   │       ├── users/page.tsx
-│   │       ├── audit/page.tsx
-│   │       └── settings/page.tsx
-│   ├── components/
-│   │   ├── ui/                      # shadcn/ui primitives (button, input, dialog…)
-│   │   ├── layout/                  # sidebar.tsx, topbar.tsx, user-menu.tsx
-│   │   ├── data-table/              # data-table.tsx, pagination.tsx
-│   │   └── shared/                  # stat-card, chart-card, confirm-dialog,
-│   │                                # empty-state, loading-state, error-state,
-│   │                                # search-input, filter-dropdown, page-header
-│   ├── features/
-│   │   ├── auth/                    # login-form, register-form
-│   │   ├── products/                # product-form, product-filters, product-table
-│   │   ├── sellers/
-│   │   ├── customers/
-│   │   ├── orders/                  # order-form (line items), order-table
-│   │   ├── inventory/
-│   │   ├── users/
-│   │   └── audit/
-│   ├── hooks/                       # use-debounce, use-range-options
-│   ├── lib/
-│   │   ├── api-client.ts            # fetch wrapper + token refresh
-│   │   ├── query-client.ts
-│   │   ├── auth-store.ts            # token persistence
-│   │   └── utils.ts                 # cn(), formatters
-│   ├── providers/                   # query-provider, auth-provider
-│   ├── schemas/                     # zod schemas per entity
-│   ├── services/                    # auth.ts, users.ts, sellers.ts, products.ts,
-│   │                                # customers.ts, orders.ts, inventory.ts,
-│   │                                # analytics.ts, audit.ts
-│   └── types/                       # API types mirroring backend schemas
+│   │   ├── layout.tsx · globals.css · page.tsx
+│   │   ├── (auth)/           # login, register, verify-email, accept-invite,
+│   │   │                     # forgot/reset password
+│   │   ├── dashboard/        # overview, products, categories, customers,
+│   │   │                     # orders, inventory, reports, sellers, users,
+│   │   │                     # marketing (coupons), shipping, refunds,
+│   │   │                     # purchase-orders, webhooks, api-keys, billing,
+│   │   │                     # settings, audit
+│   │   ├── storefront/       # public per-org store: catalog, product, cart,
+│   │   │                     # checkout, account (orders), auth pages
+│   │   ├── contact/ · terms/ · privacy/
+│   ├── components/ui|storefront   # shadcn/ui kit + storefront components
+│   ├── lib/                  # api-client (fetch + token refresh), use-api,
+│   │                         # use-list, types, format, storefront-slug
+│   └── public/               # static assets
 │
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── ERD.md
-│   ├── API.md
-│   ├── RBAC.md
-│   ├── PHASES.md
-│   └── FOLDER_STRUCTURE.md
-│
-└── docker/
-    ├── postgres.init.sql            # enable uuid extension
-    └── (optional extra docker files)
+├── e2e/                      # Playwright: auth, products, orders, storefront
+├── docker/postgres.init.sql  # uuid extension
+└── docs/                     # ARCHITECTURE · API · ERD · RBAC ·
+                              # FOLDER_STRUCTURE · PHASES (+ assets)
 ```
+
+## Rationale
+
+- **api → services → repositories → models**: dependency direction is strictly
+  inward; HTTP concerns never leak into data access.
+- **Repositories own tenancy**: the org filter is applied in `repositories/base.py`,
+  so services cannot accidentally issue cross-tenant queries.
+- **Services own transactions**: multi-table invariants (order + stock + sale +
+  outbox) are committed or rolled back as one unit.
+- **Frontend `lib/api-client`** is the single fetch wrapper: token injection,
+  one automatic refresh+retry on 401, typed helpers.

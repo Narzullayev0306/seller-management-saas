@@ -3,7 +3,7 @@
 **Production-grade multi-tenant SaaS for managing products, orders, customers, inventory, payments and analytics — with a public storefront, RBAC, PostgreSQL row-level security and an event-driven core.**
 
 [![CI](https://github.com/Narzullayev0306/seller-management-saas/actions/workflows/ci.yml/badge.svg)](https://github.com/Narzullayev0306/seller-management-saas/actions/workflows/ci.yml)
-![Backend tests](https://img.shields.io/badge/backend%20tests-149-brightgreen)
+![Backend tests](https://img.shields.io/badge/backend%20tests-228-brightgreen)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
@@ -120,7 +120,7 @@ Organization
 ## Security
 
 - Multi-tenant data isolation enforced at three levels: application scoping, forced repository filters, database RLS
-- Role-based access control: 5 roles (`owner`, `admin`, `manager`, `seller`, `viewer`) over a 32-permission catalog, server-enforced via FastAPI dependencies
+- Role-based access control: 5 staff roles (`owner`, `admin`, `manager`, `seller`, `viewer`) plus a storefront `customer` role, over a 38-permission catalog, server-enforced via FastAPI dependencies
 - bcrypt password hashing; short-lived JWT access tokens (15 min) with rotating, hashed, revocable refresh tokens
 - Redis-backed rate limiting on login/register, trusted-proxy-aware client IP resolution
 - Idempotent checkout (`Idempotency-Key`), `FOR UPDATE` inventory locking, explicit order state machine
@@ -154,7 +154,7 @@ Organization
 | Database | PostgreSQL 16 (uuid PKs, indexes, constraints, RLS) |
 | Cache / limits | Redis (tenant-aware catalog cache, rate limiting) |
 | Auth | bcrypt, PyJWT (access + rotating refresh tokens) |
-| Testing | pytest + httpx — **149 backend tests**, ESLint + tsc (frontend) |
+| Testing | pytest + httpx — **228 backend tests**, ESLint + tsc (frontend), Playwright E2E |
 | CI | GitHub Actions: ruff, pip-audit, pytest (Postgres service), tsc, eslint, npm audit, Docker builds |
 | Infra | Docker Compose (dev + prod files), background outbox worker |
 
@@ -215,7 +215,7 @@ npm run dev
 
 Interactive OpenAPI docs at `http://localhost:8000/docs` (Swagger) and `/redoc`. Full endpoint reference: [`docs/API.md`](docs/API.md).
 
-16 routers: auth, users, roles, sellers, suppliers, products, customers, orders, inventory, notifications, organizations, analytics, audit logs, uploads, coupons, storefront.
+24 routers: auth, users, roles, sellers, suppliers, products, categories, customers, orders, inventory, notifications, organizations, analytics, audit logs, uploads, coupons, storefront, shipping methods, refunds & returns, purchase orders, webhooks, API keys, billing, domains (+ public API-key endpoints).
 
 Conventions:
 
@@ -231,13 +231,13 @@ Lists accept `search`, `page`, `page_size`, `sort_by`, `sort_order` plus domain 
 
 ## Testing
 
-**149 automated backend tests** covering authentication, account security, RBAC, **multi-tenant organization isolation**, every business domain, coupons, variants, payments, storefront, idempotency, outbox, notifications and pagination:
+**228 automated backend tests** covering authentication, account security, RBAC, **multi-tenant organization isolation**, every business domain, coupons, variants, payments, storefront, idempotency, outbox, notifications and pagination:
 
 ```bash
 docker compose exec backend pytest -q
 ```
 
-CI runs the full matrix on every push: ruff + pip-audit + pytest (against a real Postgres 16 service), frontend typecheck + eslint + npm audit + production build, plus both Docker images.
+CI runs the full matrix on every push: ruff + pip-audit + pytest (against a real Postgres 16 service), frontend typecheck + eslint + npm audit + production build, both Docker images, Playwright E2E and CodeQL static analysis.
 
 ## Project Structure
 
@@ -245,26 +245,34 @@ CI runs the full matrix on every push: ruff + pip-audit + pytest (against a real
 .
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/          # 16 routers (auth, products, orders, storefront, ...)
-│   │   ├── core/            # config, security, redis, rate limiting
+│   │   ├── api/v1/          # 24 routers (auth, products, orders, storefront,
+│   │   │                    # coupons, webhooks, billing, api-keys, ...)
+│   │   ├── core/            # config, security, redis, rate limiting, middleware
 │   │   ├── db/              # session, seed CLI
 │   │   ├── models/          # SQLAlchemy ORM models
 │   │   ├── repositories/    # org-scoped data access (forced tenant filter)
 │   │   ├── schemas/         # Pydantic v2 request/response models
 │   │   └── services/        # business logic: orders, state machine, inventory,
 │   │                        # payments, coupons, outbox, idempotency, RBAC...
-│   ├── alembic/versions/    # 10 migrations: schema → storefront → outbox →
+│   ├── alembic/versions/    # 20 migrations: schema → storefront → outbox →
 │   │                        # security → payments → RLS → variants → members
-│   │                        # → coupons → customers/idempotency
-│   └── tests/               # pytest suite (149 tests)
+│   │                        # → coupons → shipping → returns → purchase orders
+│   │                        # → idempotency/customers → webhooks → API keys
+│   │                        # → billing/domains → carts → sessions → wishlists
+│   │                        # → categories
+│   └── tests/               # pytest suite (228 tests)
 ├── frontend/
 │   ├── app/
 │   │   ├── (auth)/          # login, register, verify email, accept invite
-│   │   ├── dashboard/       # overview + all domain pages
-│   │   └── storefront/      # public per-org storefront
+│   │   ├── dashboard/       # overview + all domain pages (products, orders,
+│   │   │                    # marketing, shipping, refunds, POs, webhooks,
+│   │   │                    # API keys, billing, domains, settings, ...)
+│   │   ├── contact/ · terms/ · privacy/
+│   │   └── storefront/      # public per-org storefront (+ account, checkout)
 │   ├── components/          # UI kit + notification bell, org switcher
 │   ├── lib/                 # types, api-client, auth, hooks
 │   └── proxy.ts             # route protection (Next 16 proxy)
+├── e2e/                     # Playwright suite (auth, products, orders, storefront)
 ├── docker/                  # postgres init SQL
 ├── docs/                    # ARCHITECTURE · API · ERD · RBAC · FOLDER_STRUCTURE · PHASES
 ├── docker-compose.yml       # dev stack
@@ -293,9 +301,9 @@ Sign in with the Owner demo account (`owner@techmart.uz` / `DemoPass123!`) — t
 ## Roadmap
 
 - [x] Hosted live demo with seeded data
-- [ ] E2E browser tests (register → login → product → checkout → dashboard)
-- [ ] Observability: structured request IDs, error tracking, metrics
-- [ ] Release tags & changelog
+- [x] E2E browser tests (auth, products, orders, storefront — Playwright in `e2e/`)
+- [x] Release tags & changelog (v1.0.0)
+- [ ] Observability: metrics dashboards (structured request IDs and optional Sentry error tracking already shipped)
 
 ---
 

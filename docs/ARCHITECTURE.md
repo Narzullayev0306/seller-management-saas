@@ -11,7 +11,8 @@ The system is built as a **monorepo** with two independent applications:
 | -------- | ----------------------------- | ----------------------------------- |
 | Frontend | Next.js (App Router), TypeScript, Tailwind, shadcn/ui, TanStack Query, React Hook Form, Zod, Recharts | Client SPA served by Next.js        |
 | Backend  | FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic, PostgreSQL | REST API + business logic + security |
-| Infra    | Docker Compose                | Frontend + backend + postgres       |
+| Cache    | Redis                         | Catalog cache + rate limiting       |
+| Infra    | Docker Compose                | Frontend + backend + worker + Postgres + Redis (+ Caddy in prod) |
 
 ## 2. High-level diagram
 
@@ -66,17 +67,18 @@ models + db (ORM, engine, migrations)
 
 ## 4. Frontend architecture
 
-- **App Router** with route groups: `(auth)` for login/register, `(dashboard)`
-  for the authenticated shell (sidebar + top bar).
+- **App Router** with route groups: `(auth)` for login/register, `dashboard/`
+  for the authenticated shell (sidebar + top bar) and `storefront/` for the
+  public per-org storefront (with customer account, cart, checkout).
 - **Server state**: TanStack Query with a centralized API client
   (`lib/api-client`) that injects the access token and transparently refreshes
-  expired tokens.
+  expired tokens (one automatic retry on 401).
 - **Forms**: React Hook Form + Zod schemas shared per entity.
 - **Components**: shadcn/ui primitives + reusable domain components
   (`DataTable`, `Pagination`, `SearchInput`, `FilterDropdown`, `StatCard`,
   `ChartCard`, `ConfirmDialog`, `EmptyState`, `LoadingState`, `ErrorState`).
-- **Routing**: middleware protects `/dashboard` routes client-side; real
-  security is enforced by the backend.
+- **Routing**: `proxy.ts` (Next 16 proxy) guards `/dashboard` routes;
+  real security is enforced by the backend.
 
 ## 5. Security model
 
@@ -90,18 +92,40 @@ models + db (ORM, engine, migrations)
 | Validation         | Pydantic schemas for every request body/query                         |
 | Secrets            | `.env` only; `.env.example` committed, real values never committed    |
 | CORS               | Restricted to configured frontend origin                              |
-| Brute force        | Slow hashing + optional rate limiting on auth endpoints               |
+| Brute force        | Slow hashing + Redis-backed rate limiting on auth endpoints (in-memory fallback) |
 | Audit              | Every sensitive action recorded in `audit_logs`                       |
 
 ## 6. Docker topology
 
 ```
-docker-compose.yml
+docker-compose.yml (dev)
 ├── postgres   (postgres:16-alpine, healthcheck, volume)
-├── backend    (uvicorn on :8000, runs alembic upgrade + seed on start)
-└── frontend   (Next.js dev server on :3000, proxies /api to backend)
+├── redis      (redis:7-alpine, cache + rate limiting; optional at runtime)
+├── migrate    (one-shot: alembic upgrade head)
+├── backend    (uvicorn on :8000, --reload)
+├── worker     (python -m app.worker — outbox dispatch: emails, webhooks)
+└── frontend   (Next.js dev server on :3000)
+
+docker-compose.prod.yml
+├── redis      (persistent volume)
+├── migrate    (one-shot: alembic upgrade head)
+├── backend    (uvicorn, 4 workers)
+├── worker     (outbox dispatch)
+├── frontend   (Next.js standalone build)
+└── caddy      (TLS termination + reverse proxy on :80/:443)
 ```
 
-- No Redis by default — not genuinely needed for the current feature set
-  (kept out per "do not add unnecessary technologies"). SQLAlchemy session
-  pooling is sufficient.
+- **Redis** backs the tenant-aware catalog cache and rate limiting. It is
+  enabled by default in production (`REDIS_ENABLED=true`) and disabled in the
+  dev compose default (`REDIS_ENABLED=false`) — the backend falls back to
+  in-memory rate limiting and skips caching when disabled.
+- **Outbox worker** polls `outbox_events` written in the same transaction as
+  the business change, so side effects survive crashes.
+- The managed path (Vercel + Supabase) runs the API via
+  `backend/api/index.py` and Postgres/Storage from Supabase; see DEPLOYMENT.md.
+
+## 7. Observability
+
+- Every response carries an `X-Request-Id`; `/api/health/ready` reports DB +
+  Redis status. Optional Sentry instrumentation via `SENTRY_DSN`.
+
