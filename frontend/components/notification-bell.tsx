@@ -53,8 +53,15 @@ export function NotificationBell() {
     const onDocClick = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   async function markRead(n: Notification) {
@@ -84,7 +91,9 @@ export function NotificationBell() {
     <div className="relative" ref={rootRef}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className="relative rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 active:scale-[0.95] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
         aria-label="Notifications"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
@@ -98,7 +107,11 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-80 origin-top-right animate-in fade-in zoom-in-95 duration-150 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:w-96">
+        <div
+          role="dialog"
+          aria-label="Notifications"
+          className="absolute right-0 z-30 mt-2 w-80 origin-top-right animate-scale-in overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[var(--shadow-overlay)] dark:border-slate-800 dark:bg-slate-900 sm:w-96"
+        >
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Notifications</p>
             {unread > 0 && (

@@ -13,6 +13,18 @@
 
 [Documentation](docs/) · [API Reference](docs/API.md) · [Architecture](docs/ARCHITECTURE.md) · [Database ERD](docs/ERD.md) · [Deployment](DEPLOYMENT.md)
 
+## Engineering Highlights
+
+- **Multi-tenancy** — every query is scoped to the JWT-derived organization; cross-tenant access is structurally impossible and covered by a dedicated test suite
+- **PostgreSQL RLS** — Supabase row-level security policies on every org-scoped table as a second line of defense
+- **RBAC** — 5 roles, 38 granular permissions, enforced per-endpoint on both API and UI
+- **Idempotent checkout** — `Idempotency-Key` header prevents duplicate orders from double-clicks or retries
+- **Inventory locking** — `SELECT … FOR UPDATE` row locks keep stock consistent under concurrent purchases
+- **Transactional outbox** — emails and payment webhooks survive crashes via an event-driven background worker
+- **Redis rate limiting** — trusted-proxy-aware client IP resolution protects auth and public endpoints
+- **Automated testing** — 228 backend tests + Playwright E2E suite for auth, products, orders and storefront
+- **CI/CD** — GitHub Actions running lint, typecheck, tests, CodeQL security scans and Docker builds
+
 <p align="center">
   <img src="docs/assets/dashboard.png" alt="Analytics dashboard" width="49%">
   <img src="docs/assets/storefront.png" alt="Customer storefront" width="49%">

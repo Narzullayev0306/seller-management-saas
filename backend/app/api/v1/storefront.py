@@ -329,7 +329,7 @@ def _make_slug_routes() -> APIRouter:
         payload: BackInStockCreate,
         request: Request,
         db: Session = Depends(get_db),
-    ) -> None:
+    ):
         check_rate_limit(request, "back_in_stock", limit=5, window=60)
         org_id = resolve_storefront(db, slug)
         StorefrontService(db, org_id).request_back_in_stock(product_id, payload)
@@ -442,7 +442,7 @@ def _make_slug_routes() -> APIRouter:
         slug: str,
         payload: CustomerLogoutRequest,
         db: Session = Depends(get_db),
-    ) -> None:
+    ):
         resolve_storefront(db, slug)
         customer_auth_service.logout(db, payload.refresh_token)
 
@@ -890,7 +890,7 @@ def legacy_back_in_stock(
     payload: BackInStockCreate,
     request: Request,
     db: Session = Depends(get_db),
-) -> None:
+):
     check_rate_limit(request, "back_in_stock", limit=5, window=60)
     org_id = resolve_storefront(db, None)
     StorefrontService(db, org_id).request_back_in_stock(product_id, payload)
@@ -986,7 +986,7 @@ def legacy_auth_refresh(
 def legacy_auth_logout(
     payload: CustomerLogoutRequest,
     db: Session = Depends(get_db),
-) -> None:
+):
     resolve_storefront(db, None)
     customer_auth_service.logout(db, payload.refresh_token)
 

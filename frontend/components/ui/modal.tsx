@@ -147,6 +147,13 @@ const TOAST_VARIANTS = {
       </svg>
     </span>
   ),
+  warning: (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3" aria-hidden>
+        <path d="M12 8v5m0 3.5h.01M10.3 4.1 2.9 17a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0z" strokeWidth={2} />
+      </svg>
+    </span>
+  ),
 } as const;
 
 export function Toast({

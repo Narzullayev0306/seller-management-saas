@@ -98,7 +98,7 @@ def delete_api_key(
     key_id: UUID,
     db: Session = Depends(get_db),
     actor: User = Depends(require_permissions("settings.update")),
-) -> None:
+):
     api_key_service.delete_api_key(db, actor.effective_organization_id, key_id, actor.id)
     log_action(
         db, organization_id=actor.effective_organization_id, user_id=actor.id,
