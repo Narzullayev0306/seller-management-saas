@@ -1,7 +1,16 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/button";
+
+const SIZES = {
+  sm: "max-w-sm",
+  md: "max-w-lg",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
+} as const;
 
 export function Modal({
   open,
@@ -11,6 +20,7 @@ export function Modal({
   children,
   footer,
   loading,
+  size = "md",
 }: {
   open: boolean;
   title: string;
@@ -19,24 +29,44 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
   loading?: boolean;
+  size?: keyof typeof SIZES;
 }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm dark:bg-slate-950/70" onClick={onClose} />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-2xl dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
+      <div className="absolute inset-0 animate-in fade-in duration-150 bg-slate-900/50 backdrop-blur-[2px] dark:bg-slate-950/70" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={`relative z-10 max-h-[90vh] w-full ${SIZES[size]} animate-scale-in overflow-y-auto rounded-2xl border border-slate-200/70 bg-white shadow-[var(--shadow-overlay)] dark:border-slate-800 dark:bg-slate-900`}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4 dark:border-slate-800">
           <div>
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
-            {description && <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{description}</p>}
+            {description && <p className="mt-0.5 text-small text-slate-500 dark:text-slate-400">{description}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+            className="-mr-1.5 -mt-0.5 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
             aria-label="Close"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -80,6 +110,7 @@ export function ConfirmDialog({
       open={open}
       title={title}
       onClose={onClose}
+      size="sm"
       loading={loading}
       footer={
         <Button variant={variant} onClick={onConfirm} disabled={loading}>
@@ -87,16 +118,49 @@ export function ConfirmDialog({
         </Button>
       }
     >
-      <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{description}</p>
+      <p className="text-small leading-relaxed text-slate-600 dark:text-slate-300">{description}</p>
     </Modal>
   );
 }
 
-export function Toast({ message }: { message: string | null }) {
+const TOAST_VARIANTS = {
+  default: null,
+  success: (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3" aria-hidden>
+        <path d="M20 6L9 17l-5-5" />
+      </svg>
+    </span>
+  ),
+  error: (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-white">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" className="h-3 w-3" aria-hidden>
+        <path d="M18 6L6 18M6 6l12 12" />
+      </svg>
+    </span>
+  ),
+  info: (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-white">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" className="h-3 w-3" aria-hidden>
+        <path d="M12 8h.01M12 12v4" />
+        <circle cx="12" cy="12" r="9" strokeWidth={2} />
+      </svg>
+    </span>
+  ),
+} as const;
+
+export function Toast({
+  message,
+  variant = "default",
+}: {
+  message: string | null;
+  variant?: keyof typeof TOAST_VARIANTS;
+}) {
   if (!message) return null;
   return (
-    <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2">
-      <div className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg dark:bg-slate-100 dark:text-slate-900">
+    <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 animate-fade-up" role="status" aria-live="polite">
+      <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-slate-900 px-4 py-2.5 text-small font-medium text-white shadow-[var(--shadow-overlay)] dark:bg-slate-100 dark:text-slate-900">
+        {TOAST_VARIANTS[variant]}
         {message}
       </div>
     </div>

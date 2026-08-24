@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { PageHeader, Toolbar } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { DataTable, Pagination } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

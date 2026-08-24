@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Spinner } from "@/components/ui/button";
-import { Button } from "@/components/ui/button";
+import { Button, Spinner } from "@/components/ui/button";
 
 export function Badge({ className = "", children }: { className?: string; children: ReactNode }) {
   return (
@@ -13,30 +12,56 @@ export function Badge({ className = "", children }: { className?: string; childr
   );
 }
 
-export function PageLoading({ label = "Loading..." }: { label?: string }) {
+export function PageLoading({ label = "Loading" }: { label?: string }) {
   return (
     <div className="flex h-48 flex-col items-center justify-center gap-3 text-slate-400 dark:text-slate-500">
       <Spinner className="h-6 w-6" />
-      <p className="text-sm">{label}</p>
+      <p className="text-small">{label}...</p>
     </div>
   );
 }
 
 export function LoadingSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="space-y-3 p-5">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="animate-pulse">
-          <div className="h-10 rounded-lg bg-slate-100 dark:bg-slate-800" />
-        </div>
-      ))}
+    <div className="p-5">
+      {/* Header line */}
+      <div className="skeleton mb-4 h-7 w-44 rounded-lg" />
+      {/* Table-ish rows */}
+      <div className="space-y-3">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3" style={{ opacity: 1 - i * 0.12 }}>
+            <div className="skeleton h-9 w-9 shrink-0 rounded-lg" />
+            <div className="skeleton h-9 flex-1 rounded-lg" style={{ maxWidth: `${90 - i * 8}%` }} />
+            <div className="skeleton hidden h-9 w-24 rounded-lg sm:block" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
+function EmptyIllustration() {
+  return (
+    <svg viewBox="0 0 160 120" fill="none" aria-hidden className="h-auto w-40">
+      <rect x="24" y="28" width="112" height="76" rx="10" className="fill-slate-100 dark:fill-slate-800/60" />
+      <rect x="38" y="46" width="52" height="7" rx="3.5" className="fill-slate-200 dark:fill-slate-700" />
+      <rect x="38" y="60" width="84" height="7" rx="3.5" className="fill-slate-200 dark:fill-slate-700" />
+      <rect x="38" y="74" width="66" height="7" rx="3.5" className="fill-slate-200 dark:fill-slate-700" />
+      <circle cx="118" cy="34" r="18" className="fill-indigo-100 dark:fill-indigo-500/15" />
+      <path
+        d="M111 34l5 5 9-10"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="stroke-indigo-500 dark:stroke-indigo-400"
+      />
+    </svg>
+  );
+}
+
 export function EmptyState({
-  title = "No results found",
-  description = "Try adjusting your search or filter to find what you're looking for.",
+  title = "Nothing here yet",
+  description = "Get started by creating your first item.",
   icon,
   action,
 }: {
@@ -46,21 +71,11 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
-        {icon ?? (
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
-            />
-          </svg>
-        )}
-      </div>
+    <div className="animate-fade-up flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+      {icon ?? <EmptyIllustration />}
       <div>
-        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</p>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p>
+        <p className="text-base font-semibold text-slate-800 dark:text-slate-100">{title}</p>
+        <p className="mx-auto mt-1 max-w-sm text-small leading-relaxed text-slate-500 dark:text-slate-400">{description}</p>
       </div>
       {action}
     </div>
@@ -81,19 +96,23 @@ export function ErrorState({
       ? String((error as { message: unknown }).message)
       : null;
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500 dark:bg-red-950/50 dark:text-red-400">
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-          />
-        </svg>
-      </div>
+    <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+      <svg viewBox="0 0 160 120" fill="none" aria-hidden className="h-auto w-36">
+        <circle cx="80" cy="56" r="42" className="fill-red-50 dark:fill-red-950/30" />
+        <circle cx="80" cy="56" r="27" className="fill-red-100 dark:fill-red-900/40" />
+        <path
+          d="M80 44v14m0 8h.01"
+          strokeWidth="4"
+          strokeLinecap="round"
+          className="stroke-red-500 dark:stroke-red-400"
+        />
+        <path d="M32 104h96" strokeWidth="3" strokeLinecap="round" className="stroke-red-100 dark:stroke-red-950" />
+      </svg>
       <div>
-        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{message}</p>
-        {detail && detail !== message && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{detail}</p>}
+        <p className="text-base font-semibold text-slate-800 dark:text-slate-100">{message}</p>
+        {detail && detail !== message && (
+          <p className="mx-auto mt-1 max-w-sm text-small leading-relaxed text-slate-500 dark:text-slate-400">{detail}</p>
+        )}
       </div>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>

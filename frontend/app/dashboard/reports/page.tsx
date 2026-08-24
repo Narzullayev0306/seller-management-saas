@@ -24,7 +24,6 @@ type ReportPeriod = "7d" | "30d" | "this_month" | "year";
 
 export default function DashboardReportsPage() {
   const [period, setPeriod] = useState<ReportPeriod>("30d");
-  const [loading, setLoading] = useState(false);
 
   // Mock aggregated report data for demonstration
   const [reportData, setReportData] = useState<SalesReportItem[]>([
@@ -37,17 +36,16 @@ export default function DashboardReportsPage() {
     { date: "2026-08-18", orders: 48, grossSales: 7300, discounts: 490, netRevenue: 6810 },
   ]);
 
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([
+  const topProducts: TopProduct[] = [
     { name: "Pro Wireless Noise-Cancelling Headphones", category: "Electronics", unitsSold: 142, revenue: 21300 },
     { name: "Mechanical Gaming Keyboard RGB", category: "Accessories", unitsSold: 98, revenue: 12740 },
     { name: "Ultra-Fast USB-C 100W GaN Charger", category: "Electronics", unitsSold: 215, revenue: 9675 },
     { name: "Ergonomic Memory Foam Lumbar Support", category: "Furniture", unitsSold: 84, revenue: 5880 },
     { name: "Stainless Steel Smart Thermos 750ml", category: "Kitchen", unitsSold: 110, revenue: 3850 },
-  ]);
+  ];
 
   useEffect(() => {
     async function loadBackendData() {
-      setLoading(true);
       try {
         const res = await api.get<{ items?: { total?: number | string }[] }>("/orders?page_size=100");
         if (res?.items && res.items.length > 0) {
@@ -67,8 +65,6 @@ export default function DashboardReportsPage() {
         }
       } catch {
         // use default reportData
-      } finally {
-        setLoading(false);
       }
     }
     void loadBackendData();

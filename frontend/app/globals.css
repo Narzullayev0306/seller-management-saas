@@ -3,9 +3,65 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ---------------------------------------------------------------------------
+ * Design tokens
+ * One brand scale (indigo), neutral grayscale (slate) and semantic scales.
+ * Every scale runs 50 → 900. Components consume them through Tailwind
+ * utilities; the CSS variables below exist for charts, inline styles and
+ * third-party theming.
+ * ------------------------------------------------------------------------- */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand — indigo */
+  --brand-50: #eef2ff;
+  --brand-100: #e0e7ff;
+  --brand-200: #c7d2fe;
+  --brand-300: #a5b4fc;
+  --brand-400: #818cf8;
+  --brand-500: #6366f1;
+  --brand-600: #4f46e5;
+  --brand-700: #4338ca;
+  --brand-800: #3730a3;
+  --brand-900: #312e81;
+
+  /* Success */
+  --success-50: #ecfdf5;
+  --success-100: #d1fae5;
+  --success-500: #10b981;
+  --success-600: #059669;
+  --success-700: #047857;
+
+  /* Warning */
+  --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+
+  /* Danger */
+  --danger-50: #fef2f2;
+  --danger-100: #fee2e2;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
+
+  /* Info */
+  --info-50: #eff6ff;
+  --info-100: #dbeafe;
+  --info-500: #3b82f6;
+  --info-600: #2563eb;
+  --info-700: #1d4ed8;
+
+  /* Elevation (light) */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-raised: 0 2px 4px -1px rgb(15 23 42 / 0.05), 0 6px 16px -4px rgb(15 23 42 / 0.1);
+  --shadow-overlay: 0 12px 24px -8px rgb(15 23 42 / 0.18), 0 24px 48px -16px rgb(15 23 42 / 0.22);
+}
+
+html.dark {
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-raised: 0 2px 4px -1px rgb(0 0 0 / 0.5), 0 6px 16px -4px rgb(0 0 0 / 0.45);
+  --shadow-overlay: 0 12px 24px -8px rgb(0 0 0 / 0.55), 0 24px 48px -16px rgb(0 0 0 / 0.5);
 }
 
 @theme inline {
@@ -13,20 +69,234 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Semantic aliases usable as Tailwind utilities: bg-brand-600 etc. */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+
+  /* Motion — fast and subtle per the animation system */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-fade-up: fade-up 0.25s var(--ease-out-quart) both;
+  --animate-scale-in: scale-in 0.18s var(--ease-out-quart) both;
+  --animate-slide-in-right: slide-in-right 0.22s var(--ease-out-quart) both;
+
+  @keyframes shimmer {
+    from {
+      background-position: -200% 0;
+    }
+    to {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 html {
   color-scheme: light;
+  scroll-behavior: smooth;
 }
 
 html.dark {
   color-scheme: dark;
+}
+
+::selection {
+  background-color: color-mix(in oklab, var(--brand-500) 22%, transparent);
+}
+
+/* Focus ring standard — consistent, accessible, never removed */
+:focus-visible {
+  outline: none;
+}
+
+/* Refined scrollbars (WebKit + Firefox) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.4) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: rgb(148 163 184 / 0.35);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(148 163 184 / 0.55);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+ * Typography hierarchy
+ * -------------------------------------------------------------------------- */
+
+.text-display {
+  font-size: clamp(1.75rem, 1.2rem + 1.8vw, 2.375rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+.text-h1 {
+  font-size: 1.375rem;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  font-weight: 650;
+}
+.text-h2 {
+  font-size: 1.125rem;
+  line-height: 1.4;
+  letter-spacing: -0.014em;
+  font-weight: 600;
+}
+.text-h3 {
+  font-size: 1rem;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+.text-h4 {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-weight: 600;
+}
+.text-body-lg {
+  font-size: 1rem;
+  line-height: 1.65;
+  font-weight: 400;
+}
+.text-body {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  font-weight: 400;
+}
+.text-small {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.text-caption {
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  font-weight: 450;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+ * Shared primitives
+ * -------------------------------------------------------------------------- */
+
+/* Shimmer skeleton block — pair with .rounded-* and sizing utilities */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: rgb(148 163 184 / 0.16);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.55),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+.dark .skeleton::after {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.07),
+    transparent
+  );
+}
+
+/* Premium card hover elevation */
+.card-hover {
+  transition:
+    box-shadow 0.2s var(--ease-out-quart),
+    border-color 0.2s var(--ease-out-quart),
+    transform 0.2s var(--ease-out-quart);
+}
+.card-hover:hover {
+  box-shadow: var(--shadow-raised);
+  border-color: rgb(148 163 184 / 0.4);
+}
+
+/* Page transition wrapper (applied by keyed route containers) */
+.page-enter {
+  animation: fade-up 0.25s var(--ease-out-quart) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @keyframes wave {

@@ -1,12 +1,23 @@
+"use client";
+
 import type { ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/button";
+import { Button, Spinner } from "@/components/ui/button";
+import { downloadCsv, type CsvValue } from "@/lib/csv";
+import { useLocalValue } from "@/lib/local-store";
 
-interface TableProps<T> {
-  columns: { key: string; header: string; className?: string }[];
+interface Column {
+  key: string;
+  header: string;
+  className?: string;
+}
+
+interface DataTableProps<T> {
+  columns: Column[];
   rows: T[];
   renderRow: (row: T) => ReactNode[];
+  /** Rendered instead of the table on <md screens. Falls back to horizontal scroll. */
+  renderMobileCard?: (row: T) => ReactNode;
   loading?: boolean;
   error?: unknown;
   emptyTitle?: string;
@@ -15,12 +26,60 @@ interface TableProps<T> {
   onSort?: (key: string) => void;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  /** Extra controls (filters, export buttons…) rendered above the table. */
+  toolbar?: ReactNode;
+  /** When provided, an Export CSV button appears in the header row. */
+  csv?: {
+    filename: string;
+    headers?: Record<string, string>;
+    row: (row: T) => Record<string, CsvValue>;
+  };
+}
+
+const DENSITY_KEY = "sms_table_density";
+
+type Density = "comfortable" | "compact";
+
+function useDensity(): [Density, (d: Density) => void] {
+  const [stored, setValue] = useLocalValue(DENSITY_KEY);
+  const density: Density = stored === "compact" ? "compact" : "comfortable";
+  const update = (d: Density) => setValue(d);
+  return [density, update];
+}
+
+function SortIcon({ active, order }: { active: boolean; order?: "asc" | "desc" }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={`h-3 w-3 transition-transform duration-150 ${active ? "text-indigo-600 dark:text-indigo-400" : "text-slate-300 group-hover:text-slate-400 dark:text-slate-600"} ${active && order === "asc" ? "" : ""}`}
+    >
+      {/* up chevron */}
+      <path d="M4.5 9.5 8 6l3.5 3.5" transform={active && order === "desc" ? "rotate(180 8 8)" : undefined} />
+    </svg>
+  );
+}
+
+function SkeletonRows() {
+  return (
+    <div className="space-y-3 p-5">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="skeleton h-11 rounded-xl" style={{ opacity: 1 - i * 0.13 }} />
+      ))}
+    </div>
+  );
 }
 
 export function DataTable<T extends { id: string }>({
   columns,
   rows,
   renderRow,
+  renderMobileCard,
   loading,
   error,
   emptyTitle = "No results found",
@@ -29,21 +88,18 @@ export function DataTable<T extends { id: string }>({
   onSort,
   sortBy,
   sortOrder,
-}: TableProps<T>) {
-  if (loading) {
-    return (
-      <div className="space-y-3 p-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
-        ))}
-      </div>
-    );
-  }
+  toolbar,
+  csv,
+}: DataTableProps<T>) {
+  const [density, setDensity] = useDensity();
+  const cellPad = density === "compact" ? "px-4 py-2" : "px-4 py-3";
+
+  if (loading) return <SkeletonRows />;
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500 dark:bg-red-950/50 dark:text-red-400">
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path
               strokeLinecap="round"
@@ -52,7 +108,7 @@ export function DataTable<T extends { id: string }>({
             />
           </svg>
         </div>
-        <p className="text-sm font-semibold text-slate-700">
+        <p className="text-small font-semibold text-slate-700">
           {error && typeof error === "object" && "message" in error
             ? String((error as { message: unknown }).message)
             : "Something went wrong"}
@@ -69,7 +125,7 @@ export function DataTable<T extends { id: string }>({
   if (rows.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path
               strokeLinecap="round"
@@ -79,54 +135,154 @@ export function DataTable<T extends { id: string }>({
           </svg>
         </div>
         <div>
-          <p className="text-sm font-semibold text-slate-700">{emptyTitle}</p>
-          <p className="mt-1 text-sm text-slate-500">{emptyDescription}</p>
+          <p className="text-small font-semibold text-slate-700">{emptyTitle}</p>
+          <p className="mt-1 text-small text-slate-500">{emptyDescription}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/40">
-            {columns.map((col) => (
+    <div>
+      {(toolbar || csv || onSort) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800">
+          <div className="flex flex-wrap items-center gap-2">{toolbar}</div>
+          <div className="flex items-center gap-2">
+            {csv && (
+              <Button variant="ghost" size="xs" onClick={() => downloadCsv(csv.filename, rows.map(csv.row), csv.headers)}>
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                CSV
+              </Button>
+            )}
+            <div
+              className="flex overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+              role="group"
+              aria-label="Table density"
+            >
+              {(["comfortable", "compact"] as Density[]).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDensity(d)}
+                  aria-pressed={density === d}
+                  title={d === "comfortable" ? "Comfortable rows" : "Compact rows"}
+                  className={`px-2 py-1 text-[11px] font-medium capitalize transition ${
+                    density === d
+                      ? "bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-white"
+                      : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile cards */}
+      {renderMobileCard ? (
+        <>
+          <ul className="divide-y divide-slate-100 md:hidden dark:divide-slate-800">
+            {rows.map((row) => (
+              <li key={row.id} className="animate-fade-up">
+                {renderMobileCard(row)}
+              </li>
+            ))}
+          </ul>
+          <div className="hidden max-h-[calc(100vh-22rem)] overflow-auto md:block">
+            <DesktopTable
+              columns={columns}
+              rows={rows}
+              renderRow={renderRow}
+              cellPad={cellPad}
+              onSort={onSort}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="max-h-[calc(100vh-22rem)] overflow-auto">
+          <DesktopTable
+            columns={columns}
+            rows={rows}
+            renderRow={renderRow}
+            cellPad={cellPad}
+            onSort={onSort}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DesktopTable<T extends { id: string }>({
+  columns,
+  rows,
+  renderRow,
+  cellPad,
+  onSort,
+  sortBy,
+  sortOrder,
+}: {
+  columns: Column[];
+  rows: T[];
+  renderRow: (row: T) => ReactNode[];
+  cellPad: string;
+  onSort?: (key: string) => void;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}) {
+  return (
+    <table className="w-full min-w-[640px] text-left text-sm">
+      <thead className="sticky top-0 z-10">
+        <tr className="border-b border-slate-200 bg-white/95 backdrop-blur-sm supports-[backdrop-filter]:bg-white/80 dark:border-slate-800 dark:bg-slate-900/95 dark:supports-[backdrop-filter]:bg-slate-900/80">
+          {columns.map((col) => {
+            const active = sortBy === col.key;
+            return (
               <th
                 key={col.key}
-                className={`px-4 py-3 font-medium text-slate-500 dark:text-slate-400 ${col.className ?? ""}`}
+                scope="col"
+                aria-sort={active ? (sortOrder === "asc" ? "ascending" : "descending") : undefined}
+                className={`px-4 py-3 font-medium text-caption uppercase tracking-wider text-slate-400 dark:text-slate-500 ${col.className ?? ""}`}
               >
                 {onSort ? (
                   <button
                     type="button"
                     onClick={() => onSort(col.key)}
-                    className="inline-flex items-center gap-1 uppercase tracking-wide hover:text-slate-800"
+                    className={`group inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-slate-700 dark:hover:text-slate-200 ${active ? "text-slate-700 dark:text-slate-200" : ""}`}
                   >
                     {col.header}
-                    {sortBy === col.key && (
-                      <span className="text-indigo-600">{sortOrder === "asc" ? "▲" : "▼"}</span>
-                    )}
+                    <SortIcon active={!!active} order={sortOrder} />
                   </button>
                 ) : (
                   <span className="uppercase tracking-wide">{col.header}</span>
                 )}
               </th>
+            );
+          })}
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+        {rows.map((row) => (
+          <tr
+            key={row.id}
+            className="transition-colors duration-100 hover:bg-slate-50/70 dark:hover:bg-slate-800/40"
+          >
+            {renderRow(row).map((cell, i) => (
+              <td key={i} className={`${cellPad} text-slate-700 dark:text-slate-300`}>
+                {cell}
+              </td>
             ))}
           </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-          {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-              {renderRow(row).map((cell, i) => (
-                <td key={i} className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -148,10 +304,12 @@ export function Pagination({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 dark:border-slate-800">
-      <p className="text-sm text-slate-500 dark:text-slate-400">
-        Showing <span className="font-medium text-slate-700 dark:text-slate-200">{from}</span>–
-        <span className="font-medium text-slate-700 dark:text-slate-200">{to}</span> of{" "}
-        <span className="font-medium text-slate-700 dark:text-slate-200">{total}</span>
+      <p className="text-small tabular-nums text-slate-500 dark:text-slate-400">
+        Showing{" "}
+        <span className="font-medium text-slate-700 dark:text-slate-200">
+          {from}–{to}
+        </span>{" "}
+        of <span className="font-medium text-slate-700 dark:text-slate-200">{total}</span>
       </p>
       <div className="flex items-center gap-2">
         <Button
@@ -159,10 +317,11 @@ export function Pagination({
           size="sm"
           disabled={page <= 1}
           onClick={() => onChange(page - 1, pageSize)}
+          aria-label="Previous page"
         >
           Previous
         </Button>
-        <span className="px-2 text-sm text-slate-600 dark:text-slate-400">
+        <span className="tabular-nums px-1 text-small text-slate-500 dark:text-slate-400">
           Page {page} of {Math.max(totalPages, 1)}
         </span>
         <Button
@@ -170,6 +329,7 @@ export function Pagination({
           size="sm"
           disabled={page >= totalPages}
           onClick={() => onChange(page + 1, pageSize)}
+          aria-label="Next page"
         >
           Next
         </Button>
@@ -182,7 +342,7 @@ export function PageLoader({ label = "Loading" }: { label?: string }) {
   return (
     <div className="flex h-48 flex-col items-center justify-center gap-3 text-slate-400">
       <Spinner className="h-6 w-6" />
-      <p className="text-sm">{label}...</p>
+      <p className="text-small">{label}...</p>
     </div>
   );
 }
