@@ -72,19 +72,21 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Create your account</h2>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        You will be registered as a customer and can start shopping right away.
-      </p>
+    <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-7 shadow-xl shadow-slate-200/50 backdrop-blur-xl dark:border-white/[0.08] dark:bg-slate-900/90 dark:shadow-2xl dark:shadow-black/50">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Create your account</h2>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Get started with your seller management workspace.
+        </p>
+      </div>
 
       {errors.form && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800">
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50/80 px-3.5 py-2.5 text-xs font-medium text-red-700 animate-shake dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
           {errors.form}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className="mt-5 space-y-3.5" noValidate>
         <Field label="Full name" error={errors.full_name}>
           <Input
             value={form.full_name}
@@ -93,7 +95,7 @@ export default function RegisterPage() {
             autoComplete="name"
           />
         </Field>
-        <Field label="Email" error={errors.email}>
+        <Field label="Work email" error={errors.email}>
           <Input
             type="email"
             value={form.email}
@@ -107,43 +109,61 @@ export default function RegisterPage() {
             type="password"
             value={form.password}
             onChange={(e) => set("password", e.target.value)}
-            placeholder="••••••••"
+            placeholder="Create a strong password"
             autoComplete="new-password"
           />
-          <ul className="mt-2 space-y-1">
+        </Field>
+
+        {/* Password Strength Checklist */}
+        <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800/80 dark:bg-slate-800/40">
+          <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Password requirements:</p>
+          <ul className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
             {PASSWORD_RULES.map((rule) => {
-              const ok = rule.test(form.password);
+              const ok = form.password.length > 0 && rule.test(form.password);
               return (
                 <li
                   key={rule.id}
-                  className={`flex items-center gap-1.5 text-xs ${ok ? "text-emerald-600" : "text-slate-400 dark:text-slate-500"}`}
+                  className={`flex items-center gap-1.5 transition-colors duration-150 ${
+                    ok
+                      ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                      : "text-slate-400 dark:text-slate-500"
+                  }`}
                 >
-                  {ok ? "✓" : "○"} {rule.label}
+                  <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] ${
+                    ok ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 font-bold" : "bg-slate-200 dark:bg-slate-700"
+                  }`}>
+                    {ok ? "✓" : "•"}
+                  </span>
+                  <span>{rule.label}</span>
                 </li>
               );
             })}
           </ul>
-        </Field>
+        </div>
+
         <Field label="Confirm password" error={errors.confirm}>
           <Input
             type="password"
             value={form.confirm}
             onChange={(e) => set("confirm", e.target.value)}
-            placeholder="••••••••"
+            placeholder="Repeat password"
             autoComplete="new-password"
           />
         </Field>
-        <Button type="submit" className="w-full" size="lg" loading={loading}>
-          {loading ? "Creating account..." : "Create account"}
-        </Button>
+
+        <div className="pt-2">
+          <Button type="submit" className="w-full" size="md" loading={loading}>
+            {loading ? "Creating account..." : "Create account"}
+          </Button>
+        </div>
       </form>
 
-      <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+      <div className="mt-6 border-t border-slate-100 pt-4 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+        <Link href="/login" className="font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-400">
           Sign in
         </Link>
-      </p>
+      </div>
     </div>
   );
 }

@@ -116,6 +116,7 @@ html.dark {
   --animate-slide-in-bottom: slide-in-bottom 0.22s var(--ease-out-quart) both;
   --animate-slide-out-bottom: slide-out-bottom 0.18s var(--ease-smooth) both;
   --animate-dot-pulse: dot-pulse 1.8s ease-in-out infinite;
+  --animate-shake: shake 0.35s ease-in-out both;
 
   @keyframes shimmer {
     from {
