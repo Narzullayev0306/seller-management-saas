@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { ApiError, clearTokens, getTokens, setTokens } from "@/lib/api-client";
+import { ApiError, clearTokens, getApiBaseUrl, getTokens, setTokens } from "@/lib/api-client";
 import type { Me, TokenPair } from "@/lib/types";
 
 interface AuthState {
@@ -46,7 +46,7 @@ function clearSessionCookie(): void {
 }
 
 async function fetchMe(): Promise<Me> {
-  const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"}/auth/me`, {
+  const resp = await fetch(`${getApiBaseUrl()}/auth/me`, {
     headers: { Authorization: `Bearer ${getTokens().access}` },
     cache: "no-store",
   });
@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (email: string, password: string) => {
       const tokens = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"}/auth/login`,
+        `${getApiBaseUrl()}/auth/login`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -112,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (data: { organization_name?: string; full_name: string; email: string; password: string }) => {
       const tokens = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"}/auth/register`,
+        `${getApiBaseUrl()}/auth/register`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -137,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (refresh) {
       try {
         await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"}/auth/logout`,
+          `${getApiBaseUrl()}/auth/logout`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

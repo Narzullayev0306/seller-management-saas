@@ -21,7 +21,12 @@ export interface ListQuery {
   [key: string]: string | number | undefined;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+export function getApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    return "/api/v1";
+  }
+  return process.env.NEXT_PUBLIC_API_URL ?? "https://seller-saas-api.vercel.app/api/v1";
+}
 
 const ACCESS_KEY = "sms_access_token";
 const REFRESH_KEY = "sms_refresh_token";
@@ -45,7 +50,11 @@ export function clearTokens(): void {
 }
 
 function buildUrl(path: string, query?: ListQuery): string {
-  const url = new URL(API_URL + path);
+  const base =
+    typeof window !== "undefined"
+      ? window.location.origin + "/api/v1"
+      : (process.env.NEXT_PUBLIC_API_URL ?? "https://seller-saas-api.vercel.app/api/v1");
+  const url = new URL(base + path);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== "") url.searchParams.set(key, String(value));

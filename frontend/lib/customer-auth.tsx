@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { ApiError } from "@/lib/api-client";
+import { ApiError, getApiBaseUrl } from "@/lib/api-client";
 import { sfPath } from "@/lib/storefront-slug";
 import type {
   CustomerMe,
@@ -24,7 +24,9 @@ const CUSTOMER_REFRESH_KEY = "sms_customer_refresh";
 const CART_TOKEN_KEY = "sms_cart_token";
 const WISHLIST_TOKEN_KEY = "sms_wishlist_token";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+function getBaseUrl(): string {
+  return getApiBaseUrl();
+}
 
 export function getCustomerTokens(): { access: string | null; refresh: string | null } {
   if (typeof window === "undefined") return { access: null, refresh: null };
@@ -113,7 +115,7 @@ export async function customerRequest<T>(
   };
   if (access) headers.Authorization = `Bearer ${access}`;
 
-  let resp = await fetch(API_URL + path, {
+  let resp = await fetch(getBaseUrl() + path, {
     method: options.method ?? "GET",
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -122,7 +124,7 @@ export async function customerRequest<T>(
 
   if (resp.status === 401 && refresh) {
     try {
-      const rotated = await fetch(API_URL + path.replace(/\/[^/]+$/, "") + "/auth/refresh", {
+      const rotated = await fetch(getBaseUrl() + path.replace(/\/[^/]+$/, "") + "/auth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: refresh }),
@@ -132,7 +134,7 @@ export async function customerRequest<T>(
         const body = (await rotated.json()) as CustomerTokenPair;
         setCustomerTokens(body.access_token, body.refresh_token);
         headers.Authorization = `Bearer ${body.access_token}`;
-        resp = await fetch(API_URL + path, {
+        resp = await fetch(getBaseUrl() + path, {
           method: options.method ?? "GET",
           headers,
           body: options.body !== undefined ? JSON.stringify(options.body) : undefined,

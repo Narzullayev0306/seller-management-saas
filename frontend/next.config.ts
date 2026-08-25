@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "picsum.photos" },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: "https://seller-saas-api.vercel.app/api/v1/:path*",
+      },
+    ];
+  },
 };
 
 export default withSentryConfig(nextConfig, {
