@@ -12,11 +12,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary:
-    "bg-indigo-600 text-white shadow-xs shadow-indigo-600/20 hover:bg-indigo-500 hover:shadow-sm hover:shadow-indigo-600/25 active:bg-indigo-700 focus-visible:ring-indigo-500 disabled:bg-indigo-300 dark:disabled:bg-indigo-900",
+    "bg-indigo-600 text-white shadow-sm shadow-indigo-600/20 hover:bg-indigo-500 hover:shadow-md hover:shadow-indigo-600/30 active:bg-indigo-700 focus-visible:ring-indigo-500 disabled:bg-indigo-300 dark:disabled:bg-indigo-900",
   secondary:
     "bg-slate-800 text-white hover:bg-slate-700 active:bg-slate-900 focus-visible:ring-slate-500 disabled:bg-slate-400 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400",
   outline:
-    "border border-slate-300 bg-white text-slate-700 shadow-xs hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 focus-visible:ring-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white",
+    "border border-slate-300 bg-white text-slate-700 shadow-xs hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 focus-visible:ring-slate-400 dark:border-slate-700 dark:bg-transparent dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800/80 dark:hover:text-white",
   ghost:
     "text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200/70 focus-visible:ring-slate-400 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
   danger:
@@ -28,8 +28,8 @@ const VARIANT_CLASSES: Record<Variant, string> = {
 const SIZE_CLASSES: Record<Size, string> = {
   xs: "h-7 px-2.5 text-xs gap-1 rounded-md",
   sm: "h-8 px-3 text-xs gap-1.5 rounded-lg",
-  md: "h-10 px-4 text-sm gap-2 rounded-xl",
-  lg: "h-12 px-6 text-base gap-2 rounded-xl",
+  md: "h-9 px-4 text-sm gap-2 rounded-lg",
+  lg: "h-11 px-6 text-sm gap-2 rounded-xl",
 };
 
 export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
@@ -56,12 +56,12 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex select-none items-center justify-center font-medium transition-[background-color,border-color,box-shadow,transform,color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100 dark:focus-visible:ring-offset-slate-950 ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
+      className={`inline-flex select-none items-center justify-center font-medium transition-[background-color,border-color,box-shadow,transform,color,opacity] duration-[130ms] ease-[cubic-bezier(0.4,0,0.2,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:scale-[0.97] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100 motion-reduce:transition-none motion-reduce:active:scale-100 dark:focus-visible:ring-offset-slate-950 ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
-      {loading && <Spinner />}
-      {children}
+      {loading && <Spinner className="mr-1 h-3.5 w-3.5 shrink-0" />}
+      <span className={loading ? "opacity-75" : ""}>{children}</span>
     </button>
   );
 }

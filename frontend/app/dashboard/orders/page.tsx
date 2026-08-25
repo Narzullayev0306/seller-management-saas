@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
 import { Badge } from "@/components/ui/states";
 import { PageHeader } from "@/components/page-header";
 import { Toolbar } from "@/components/page-header";
-import { DataTable } from "@/components/ui/table";
+import { DataTable, MobileCard } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -289,6 +289,45 @@ export default function OrdersPage() {
           onSort={toggleSort}
           sortBy={query.sort_by as string}
           sortOrder={query.sort_order as "asc" | "desc"}
+          renderMobileCard={(o) => (
+            <MobileCard
+              title={o.customer_name}
+              subtitle={`${o.order_number} · ${formatDate(o.created_at)}${o.seller_name ? ` · Seller: ${o.seller_name}` : ""}`}
+              actions={
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => openDetail(o)}>
+                    View
+                  </Button>
+                  {can("orders.update") &&
+                    nextStatuses(o).length > 0 && (
+                      <Select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) void updateStatus(o, e.target.value as OrderStatus);
+                        }}
+                        aria-label={`Change status for ${o.order_number}`}
+                        className="h-8 w-auto rounded-lg border border-slate-200 px-2 py-0 text-xs dark:border-slate-800"
+                      >
+                        <option value="" disabled>
+                          {updatingId === o.id ? "Updating..." : "Change"}
+                        </option>
+                        {nextStatuses(o).map((s) => (
+                          <option key={s} value={s}>
+                            Mark {s}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                </>
+              }
+            >
+              <span className="text-sm font-semibold tabular-nums">{formatMoney(o.total)}</span>
+              <Badge className={badgeClass(ORDER_STATUS_COLORS, o.status)}>{o.status}</Badge>
+              <Badge className={badgeClass(PAYMENT_STATUS_COLORS, o.payment_status)}>
+                {o.payment_status.replace("_", " ")}
+              </Badge>
+            </MobileCard>
+          )}
           renderRow={(o) => [
             <div key="num">
               <button type="button" className="font-mono text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400" onClick={() => openDetail(o)}>

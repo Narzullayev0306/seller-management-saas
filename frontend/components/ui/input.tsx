@@ -2,16 +2,16 @@ import { forwardRef, type InputHTMLAttributes, type SelectHTMLAttributes, type T
 
 function stateClasses(error?: boolean, success?: boolean): string {
   if (error) {
-    return "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/25 aria-invalid:text-red-600 dark:border-red-500/60 dark:focus:border-red-500";
+    return "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-red-500/60 dark:focus:border-red-500";
   }
   if (success) {
-    return "border-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25 dark:border-emerald-500/60";
+    return "border-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500/60";
   }
-  return "border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:hover:border-slate-600 dark:focus:border-indigo-500";
+  return "border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/25 dark:border-slate-700 dark:hover:border-slate-600 dark:focus:border-indigo-500";
 }
 
 const base =
-  "w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-800";
+  "w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 transition-[border-color,box-shadow] duration-[130ms] ease-[cubic-bezier(0.4,0,0.2,1)] placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 motion-reduce:transition-none dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-500";
 
 export const Input = forwardRef<
   HTMLInputElement,

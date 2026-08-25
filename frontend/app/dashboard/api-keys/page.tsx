@@ -73,6 +73,7 @@ export default function ApiKeysPage() {
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [saving, setSaving] = useState(false);
   const [createdKey, setCreatedKey] = useState<ApiKeyWithSecret | null>(null);
+  const [copied, setCopied] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -171,7 +172,11 @@ export default function ApiKeysPage() {
 
   function copyKey() {
     if (!createdKey) return;
-    void navigator.clipboard?.writeText(createdKey.key).then(() => showToast("Key copied to clipboard"));
+    void navigator.clipboard?.writeText(createdKey.key).then(() => {
+      setCopied(true);
+      showToast("Key copied to clipboard");
+      window.setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   return (
@@ -343,10 +348,18 @@ export default function ApiKeysPage() {
       <Modal
         open={createdKey !== null}
         title="API key created"
-        onClose={() => setCreatedKey(null)}
+        onClose={() => {
+          setCreatedKey(null);
+          setCopied(false);
+        }}
         footer={
-          <Button onClick={copyKey} variant="outline">
-            Copy key
+          <Button onClick={copyKey} variant={copied ? "success" : "outline"} className="transition-colors duration-150">
+            {copied && (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            )}
+            {copied ? "Copied" : "Copy key"}
           </Button>
         }
       >

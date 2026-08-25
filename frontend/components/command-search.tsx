@@ -86,10 +86,10 @@ function Palette({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[12vh]" role="dialog" aria-modal="true" aria-label="Command palette">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs dark:bg-slate-950/60" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-xl animate-scale-in overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[var(--shadow-overlay)] dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 dark:border-slate-800">
-          <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in dark:bg-slate-950/70" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-xl animate-scale-in overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[var(--shadow-overlay)] dark:border-slate-800/80 dark:bg-slate-900">
+        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800/80">
+          <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
           <input
@@ -104,9 +104,9 @@ function Palette({ onClose }: { onClose: () => void }) {
             aria-activedescendant={results[activeIndex] ? `cmd-${activeIndex}` : undefined}
             className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100"
           />
-          <kbd className="rounded-md border border-slate-200 px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-400 dark:border-slate-700">ESC</kbd>
+          <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-400 dark:border-slate-700 dark:bg-slate-800">ESC</kbd>
         </div>
-        <div ref={listRef} id="command-palette-list" role="listbox" className="max-h-80 overflow-y-auto p-2">
+        <div ref={listRef} id="command-palette-list" role="listbox" className="max-h-80 overflow-y-auto p-1.5">
           {results.length === 0 ? (
             <p className="px-3 py-10 text-center text-sm text-slate-500">No results for “{query}”</p>
           ) : (
@@ -117,7 +117,7 @@ function Palette({ onClose }: { onClose: () => void }) {
               return (
                 <div key={a.href}>
                   {showGroup && (
-                    <p className="px-3 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 first:pt-1 dark:text-slate-600">
+                    <p className="px-3 pb-1 pt-2 text-label text-slate-400 first:pt-1 dark:text-slate-600">
                       {a.type}
                     </p>
                   )}
@@ -129,26 +129,28 @@ function Palette({ onClose }: { onClose: () => void }) {
                     href={a.href}
                     onMouseEnter={() => setRawIndex(i)}
                     onClick={onClose}
-                    className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors duration-75 ${
-                      isActive ? "bg-indigo-50 dark:bg-indigo-500/10" : ""
+                    className={`group flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-[background-color,color] duration-100 ${
+                      isActive
+                        ? "bg-indigo-50/80 dark:bg-indigo-500/15"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
                     }`}
                   >
                     <span
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                      className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
                         isActive
-                          ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300"
+                          ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
                           : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                       }`}
                     >
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
                         <path d={a.icon} />
                       </svg>
                     </span>
-                    <span className={`flex-1 font-medium ${isActive ? "text-slate-900 dark:text-white" : "text-slate-700 dark:text-slate-200"}`}>
+                    <span className={`flex-1 font-medium ${isActive ? "text-indigo-900 dark:text-indigo-100" : "text-slate-700 dark:text-slate-200"}`}>
                       {a.label}
                     </span>
                     {isActive && (
-                      <kbd className="rounded-md border border-slate-200 px-1.5 py-0.5 font-mono text-[10px] text-slate-400 dark:border-slate-700">↵</kbd>
+                      <kbd className="rounded border border-indigo-200/80 bg-white px-1.5 py-0.5 font-mono text-[10px] text-indigo-600 dark:border-indigo-800 dark:bg-slate-800 dark:text-indigo-300">↵</kbd>
                     )}
                   </Link>
                 </div>
@@ -156,15 +158,15 @@ function Palette({ onClose }: { onClose: () => void }) {
             })
           )}
         </div>
-        <div className="flex items-center gap-4 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400 dark:border-slate-800 dark:text-slate-600">
+        <div className="flex items-center gap-4 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400 dark:border-slate-800/80 dark:text-slate-500">
           <span className="flex items-center gap-1.5">
-            <kbd className="rounded border border-slate-200 px-1 font-mono dark:border-slate-700">↑↓</kbd> navigate
+            <kbd className="rounded border border-slate-200 bg-slate-50 px-1 font-mono text-[10px] dark:border-slate-700 dark:bg-slate-800">↑↓</kbd> navigate
           </span>
           <span className="flex items-center gap-1.5">
-            <kbd className="rounded border border-slate-200 px-1 font-mono dark:border-slate-700">↵</kbd> open
+            <kbd className="rounded border border-slate-200 bg-slate-50 px-1 font-mono text-[10px] dark:border-slate-700 dark:bg-slate-800">↵</kbd> open
           </span>
           <span className="flex items-center gap-1.5">
-            <kbd className="rounded border border-slate-200 px-1 font-mono dark:border-slate-700">esc</kbd> close
+            <kbd className="rounded border border-slate-200 bg-slate-50 px-1 font-mono text-[10px] dark:border-slate-700 dark:bg-slate-800">esc</kbd> close
           </span>
         </div>
       </div>

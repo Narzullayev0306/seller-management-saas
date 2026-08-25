@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/states";
 import { PageHeader } from "@/components/page-header";
 import { Toolbar } from "@/components/page-header";
-import { DataTable } from "@/components/ui/table";
+import { DataTable, MobileCard } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -257,6 +257,32 @@ export default function ProductsPage() {
           onSort={toggleSort}
           sortBy={query.sort_by as string}
           sortOrder={query.sort_order as "asc" | "desc"}
+          renderMobileCard={(p) => (
+            <MobileCard
+              title={p.name}
+              subtitle={`${p.sku} · ${p.category}`}
+              actions={
+                <>
+                  {can("products.update") && (
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>
+                      Edit
+                    </Button>
+                  )}
+                  {can("products.delete") && p.status === "active" && (
+                    <Button variant="ghost" size="sm" loading={deleting === p.id} onClick={() => handleDeactivate(p)}>
+                      Deactivate
+                    </Button>
+                  )}
+                </>
+              }
+            >
+              <span className="text-sm font-semibold tabular-nums">{formatMoney(p.price)}</span>
+              <Badge className={badgeClass(STOCK_STATUS_COLORS, p.stock_status)}>{p.stock_status.replace("_", " ")}</Badge>
+              <span className={`text-xs font-medium tabular-nums ${p.stock_quantity <= p.low_stock_threshold ? "text-amber-600" : "text-slate-500 dark:text-slate-400"}`}>
+                {p.stock_quantity} in stock
+              </span>
+            </MobileCard>
+          )}
           renderRow={(p) => [
             <div key="name">
               <p className="font-medium text-slate-900 dark:text-slate-100">{p.name}</p>

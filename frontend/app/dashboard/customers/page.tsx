@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 
 import { PageHeader } from "@/components/page-header";
 import { Toolbar } from "@/components/page-header";
-import { DataTable } from "@/components/ui/table";
+import { DataTable, MobileCard } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -142,6 +142,25 @@ export default function CustomersPage() {
           onSort={toggleSort}
           sortBy={query.sort_by as string}
           sortOrder={query.sort_order as "asc" | "desc"}
+          renderMobileCard={(c) => (
+            <MobileCard
+              title={fullName(c.first_name, c.last_name)}
+              subtitle={`${c.email}${c.phone ? ` · ${c.phone}` : ""}`}
+              actions={
+                can("customers.update") && (
+                  <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>
+                    Edit
+                  </Button>
+                )
+              }
+            >
+              <span className="text-sm font-semibold tabular-nums">{formatMoney(c.total_spent)}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {c.total_orders} order{c.total_orders === 1 ? "" : "s"}
+              </span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">since {formatDate(c.created_at)}</span>
+            </MobileCard>
+          )}
           renderRow={(c) => [
             <div key="name" className="flex items-center gap-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">

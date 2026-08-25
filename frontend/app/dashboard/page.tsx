@@ -15,11 +15,12 @@ import {
   YAxis,
 } from "recharts";
 
-import { Badge, EmptyState, ErrorState, PageLoading } from "@/components/ui/states";
+import { Badge, EmptyState, ErrorState } from "@/components/ui/states";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { badgeClass, formatDate, formatMoney, ORDER_STATUS_COLORS } from "@/lib/format";
 import type { DashboardData, RangePreset } from "@/lib/types";
 import { useApi } from "@/lib/use-api";
+import { useCountUp } from "@/lib/use-count-up";
 
 const RANGES: { key: RangePreset; label: string }[] = [
   { key: "today", label: "Today" },
@@ -63,29 +64,29 @@ export default function Page() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Business overview for the selected period</p>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Dashboard</h1>
+          <p className="mt-0.5 text-small text-slate-500 dark:text-slate-400">Business overview for the selected period</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={exportCsv}
             disabled={!data}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900 active:scale-[0.98] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900 active:scale-[0.98] disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white"
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
             </svg>
             Export CSV
           </button>
-          <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+          <div className="flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800/80">
             {RANGES.map((r) => (
               <button
                 key={r.key}
                 onClick={() => setRange(r.key)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition active:scale-[0.98] ${
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition duration-150 active:scale-[0.98] ${
                   range === r.key
-                    ? "bg-white text-indigo-700 shadow-sm dark:bg-slate-900 dark:text-indigo-300"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    ? "bg-white text-indigo-700 shadow-xs dark:bg-slate-900 dark:text-indigo-300"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                 }`}
               >
                 {r.label}
@@ -95,7 +96,19 @@ export default function Page() {
         </div>
       </div>
 
-      {loading && <PageLoading />}
+      {loading && (
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="skeleton h-28 rounded-xl" />
+            ))}
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="skeleton h-80 rounded-xl lg:col-span-2" />
+            <div className="skeleton h-80 rounded-xl" />
+          </div>
+        </div>
+      )}
       {error && <ErrorState message="Failed to load analytics" onRetry={refetch} />}
       {!loading && !error && data && (
         <>
@@ -137,13 +150,19 @@ function StatCards({ summary, points }: { summary: DashboardData["summary"]; poi
     return Math.round(((second - first) / first) * 100);
   }, [values]);
 
-  const stats: { label: string; value: string; spark?: number[] }[] = [
-    { label: "Revenue", value: formatMoney(summary.revenue), spark: values },
-    { label: "Orders", value: String(summary.orders_count) },
-    { label: "Avg order value", value: formatMoney(summary.avg_order_value) },
-    { label: "Customers", value: String(summary.customers_count) },
-    { label: "Active sellers", value: String(summary.active_sellers) },
-    { label: "Commission earned", value: formatMoney(summary.total_commission) },
+  const stats: {
+    label: string;
+    value: string;
+    countTo?: number;
+    format?: (n: number) => string;
+    spark?: number[];
+  }[] = [
+    { label: "Revenue", value: formatMoney(summary.revenue), countTo: Number(summary.revenue), format: formatMoney, spark: values },
+    { label: "Orders", value: String(summary.orders_count), countTo: Number(summary.orders_count), format: (n) => String(Math.round(n)) },
+    { label: "Avg order value", value: formatMoney(summary.avg_order_value), countTo: Number(summary.avg_order_value), format: formatMoney },
+    { label: "Customers", value: String(summary.customers_count), countTo: Number(summary.customers_count), format: (n) => String(Math.round(n)) },
+    { label: "Active sellers", value: String(summary.active_sellers), countTo: Number(summary.active_sellers), format: (n) => String(Math.round(n)) },
+    { label: "Commission earned", value: formatMoney(summary.total_commission), countTo: Number(summary.total_commission), format: formatMoney },
   ];
 
   return (
@@ -158,14 +177,20 @@ function StatCards({ summary, points }: { summary: DashboardData["summary"]; poi
 function StatCard({
   label,
   value,
+  countTo,
+  format,
   spark,
   trend,
 }: {
   label: string;
   value: string;
+  countTo?: number;
+  format?: (n: number) => string;
   spark?: number[];
   trend?: number | null;
 }) {
+  const animated = useCountUp(countTo ?? null);
+  const display = countTo !== undefined && format ? format(animated) : value;
   const path = useMemo(() => {
     if (!spark || spark.length < 2) return null;
     const w = 96;
@@ -198,18 +223,18 @@ function StatCard({
           </span>
           {trend !== null && trend !== undefined && (
             <span
-              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                 trend >= 0
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"
               }`}
             >
               {trend >= 0 ? "▲" : "▼"} {Math.abs(trend)}%
             </span>
           )}
         </div>
-        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
-        <p className="mt-0.5 text-xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
+        <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
+        <p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">{display}</p>
         {path && (
           <svg className="mt-2 h-8 w-full" viewBox="0 0 96 32" preserveAspectRatio="none" aria-hidden="true">
             <defs>
@@ -266,19 +291,28 @@ function RevenueChart({ points }: { points: DashboardData["revenue_over_time"] }
                   }
                 />
                 <Tooltip
+                  animationDuration={150}
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
                     return (
-                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                      <div className="origin-bottom-left animate-scale-in rounded-lg border border-slate-200/80 bg-white px-3 py-2 shadow-[var(--shadow-raised)] dark:border-slate-700 dark:bg-slate-900">
                         <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        <p className="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                           {formatMoney(Number(payload[0].value))}
                         </p>
                       </div>
                     );
                   }}
                 />
-                <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} fill="url(#revenue-fill)" />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#6366f1"
+                  strokeWidth={2}
+                  fill="url(#revenue-fill)"
+                  animationDuration={450}
+                  animationEasing="ease-out"
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -481,19 +515,30 @@ function StatusDistribution({ items }: { items: DashboardData["status_distributi
             <div className="h-44 w-44 shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={data} dataKey="value" nameKey="name" innerRadius={48} outerRadius={76} paddingAngle={3} strokeWidth={0}>
+                  <Pie
+                    data={data}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={48}
+                    outerRadius={76}
+                    paddingAngle={3}
+                    strokeWidth={0}
+                    animationDuration={500}
+                    animationEasing="ease-out"
+                  >
                     {data.map((entry) => (
                       <Cell key={entry.name} fill={STATUS_PIE_COLORS[entry.name] ?? "#94a3b8"} />
                     ))}
                   </Pie>
                   <Tooltip
+                    animationDuration={150}
                     content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const p = payload[0];
                       return (
-                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                        <div className="animate-scale-in rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[var(--shadow-overlay)] dark:border-slate-700 dark:bg-slate-900">
                           <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{p.name}</p>
-                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          <p className="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                             {p.value} order{p.value === 1 ? "" : "s"}
                           </p>
                         </div>

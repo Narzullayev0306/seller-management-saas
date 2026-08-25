@@ -93,14 +93,14 @@ export function NotificationBell() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="relative rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 active:scale-[0.95] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        className="relative rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 active:scale-[0.95] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
         aria-label="Notifications"
       >
-        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-xs animate-dot-pulse">
             {unread > 99 ? "99+" : unread}
           </span>
         )}
@@ -110,12 +110,15 @@ export function NotificationBell() {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 z-30 mt-2 w-80 origin-top-right animate-scale-in overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[var(--shadow-overlay)] dark:border-slate-800 dark:bg-slate-900 sm:w-96"
+          className="absolute right-0 z-30 mt-2 w-80 origin-top-right animate-scale-in overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[var(--shadow-overlay)] dark:border-slate-800/80 dark:bg-slate-900 sm:w-96"
         >
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800/80">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Notifications</p>
             {unread > 0 && (
-              <button onClick={() => void markAllRead()} className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+              <button
+                onClick={() => void markAllRead()}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-500 active:scale-95 transition dark:text-indigo-400"
+              >
                 Mark all read
               </button>
             )}
@@ -123,9 +126,9 @@ export function NotificationBell() {
 
           <div className="max-h-96 overflow-y-auto">
             {loading && items.length === 0 && (
-              <div className="space-y-3 px-4 py-5">
+              <div className="space-y-2.5 px-4 py-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+                  <div key={i} className="skeleton h-12 rounded-lg" style={{ opacity: Math.max(1 - i * 0.2, 0.4) }} />
                 ))}
               </div>
             )}
@@ -133,7 +136,10 @@ export function NotificationBell() {
             {!loading && error && (
               <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
                 <p className="text-sm text-slate-500 dark:text-slate-400">{error}</p>
-                <button onClick={() => void refresh()} className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+                <button
+                  onClick={() => void refresh()}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                >
                   Retry
                 </button>
               </div>
@@ -149,8 +155,8 @@ export function NotificationBell() {
               <button
                 key={n.id}
                 onClick={() => void markRead(n)}
-                className={`block w-full border-b border-slate-100 px-4 py-3 text-left transition last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 ${
-                  !n.read ? "bg-indigo-50/50 dark:bg-indigo-950/20" : ""
+                className={`block w-full border-b border-slate-100/80 px-4 py-3 text-left transition duration-150 last:border-0 hover:bg-slate-50 dark:border-slate-800/60 dark:hover:bg-slate-800/50 ${
+                  !n.read ? "bg-indigo-50/40 dark:bg-indigo-950/20" : ""
                 }`}
               >
                 <div className="flex items-start gap-2.5">
@@ -162,7 +168,7 @@ export function NotificationBell() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{n.title}</p>
                     <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{n.message}</p>
-                    <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    <p className="mt-1 text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       {formatRelative(n.created_at)}
                     </p>
                   </div>

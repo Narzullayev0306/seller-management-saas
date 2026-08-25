@@ -54,14 +54,28 @@
 
   /* Elevation (light) */
   --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
-  --shadow-raised: 0 2px 4px -1px rgb(15 23 42 / 0.05), 0 6px 16px -4px rgb(15 23 42 / 0.1);
-  --shadow-overlay: 0 12px 24px -8px rgb(15 23 42 / 0.18), 0 24px 48px -16px rgb(15 23 42 / 0.22);
+  --shadow-raised: 0 2px 8px -2px rgb(15 23 42 / 0.08), 0 6px 20px -4px rgb(15 23 42 / 0.12);
+  --shadow-overlay: 0 8px 30px -6px rgb(15 23 42 / 0.18), 0 24px 56px -16px rgb(15 23 42 / 0.2);
+  --shadow-brand: 0 4px 14px 0 rgb(99 102 241 / 0.25);
+
+  /* Motion system */
+  --duration-instant: 80ms;
+  --duration-fast: 130ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --duration-xslow: 420ms;
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 html.dark {
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
-  --shadow-raised: 0 2px 4px -1px rgb(0 0 0 / 0.5), 0 6px 16px -4px rgb(0 0 0 / 0.45);
-  --shadow-overlay: 0 12px 24px -8px rgb(0 0 0 / 0.55), 0 24px 48px -16px rgb(0 0 0 / 0.5);
+  --shadow-raised: 0 2px 8px -2px rgb(0 0 0 / 0.5), 0 6px 20px -4px rgb(0 0 0 / 0.45);
+  --shadow-overlay: 0 8px 30px -6px rgb(0 0 0 / 0.55), 0 24px 56px -16px rgb(0 0 0 / 0.5);
+  --shadow-brand: 0 4px 14px 0 rgb(99 102 241 / 0.35);
 }
 
 @theme inline {
@@ -85,13 +99,23 @@ html.dark {
   --shadow-card: var(--shadow-card);
   --shadow-raised: var(--shadow-raised);
   --shadow-overlay: var(--shadow-overlay);
+  --shadow-brand: var(--shadow-brand);
 
   /* Motion — fast and subtle per the animation system */
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-fade-up: fade-up 0.25s var(--ease-out-quart) both;
+  --animate-fade-in: fade-in 0.2s var(--ease-smooth) both;
   --animate-scale-in: scale-in 0.18s var(--ease-out-quart) both;
+  --animate-scale-out: scale-out 0.15s var(--ease-smooth) both;
   --animate-slide-in-right: slide-in-right 0.22s var(--ease-out-quart) both;
+  --animate-slide-in-left: slide-in-left 0.22s var(--ease-out-quart) both;
+  --animate-slide-in-bottom: slide-in-bottom 0.22s var(--ease-out-quart) both;
+  --animate-slide-out-bottom: slide-out-bottom 0.18s var(--ease-smooth) both;
+  --animate-dot-pulse: dot-pulse 1.8s ease-in-out infinite;
 
   @keyframes shimmer {
     from {
@@ -104,32 +128,107 @@ html.dark {
   @keyframes fade-up {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
-  @keyframes scale-in {
+  @keyframes fade-in {
     from {
       opacity: 0;
-      transform: scale(0.97);
     }
     to {
       opacity: 1;
-      transform: scale(1);
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+  @keyframes scale-out {
+    from {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.96) translateY(-4px);
     }
   }
   @keyframes slide-in-right {
     from {
       opacity: 0;
-      transform: translateX(12px);
+      transform: translateX(16px);
     }
     to {
       opacity: 1;
       transform: translateX(0);
     }
+  }
+  @keyframes slide-in-left {
+    from {
+      opacity: 0;
+      transform: translateX(-16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-in-bottom {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes slide-out-bottom {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+  @keyframes dot-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.3);
+      opacity: 0.75;
+    }
+  }
+  @keyframes wave {
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    50% {
+      transform: rotate(20deg);
+    }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15%       { transform: translateX(-4px); }
+    30%       { transform: translateX(3px); }
+    45%       { transform: translateX(-2px); }
+    60%       { transform: translateX(2px); }
+    75%       { transform: translateX(-1px); }
   }
 }
 
@@ -157,24 +256,26 @@ html.dark {
 
 /* Focus ring standard — consistent, accessible, never removed */
 :focus-visible {
-  outline: none;
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* Refined scrollbars (WebKit + Firefox) */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgb(148 163 184 / 0.4) transparent;
+  scrollbar-color: rgb(148 163 184 / 0.3) transparent;
 }
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-thumb {
   border-radius: 9999px;
-  background-color: rgb(148 163 184 / 0.35);
+  background-color: rgb(148 163 184 / 0.3);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(148 163 184 / 0.55);
+  background-color: rgb(148 163 184 / 0.5);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -235,6 +336,31 @@ html.dark {
   font-weight: 450;
 }
 
+/* KPI large numbers — Dashboard, Analytics */
+.text-kpi {
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Table / section header labels */
+.text-label {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  letter-spacing: 0.065em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Monospace small — API keys, code */
+.text-mono-sm {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  letter-spacing: -0.01em;
+}
+
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
@@ -247,45 +373,93 @@ html.dark {
 .skeleton {
   position: relative;
   overflow: hidden;
-  background-color: rgb(148 163 184 / 0.16);
+  background-color: rgb(148 163 184 / 0.14);
+  border-radius: 6px;
 }
 .skeleton::after {
   content: "";
   position: absolute;
   inset: 0;
-  transform: translateX(-100%);
   background-image: linear-gradient(
     90deg,
-    transparent,
-    rgb(255 255 255 / 0.55),
-    transparent
+    transparent 0%,
+    rgb(255 255 255 / 0.5) 40%,
+    rgb(255 255 255 / 0.7) 50%,
+    rgb(255 255 255 / 0.5) 60%,
+    transparent 100%
   );
-  animation: shimmer 1.6s infinite;
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+.dark .skeleton {
+  background-color: rgb(30 41 59 / 0.7);
 }
 .dark .skeleton::after {
   background-image: linear-gradient(
     90deg,
-    transparent,
-    rgb(255 255 255 / 0.07),
-    transparent
+    transparent 0%,
+    rgb(255 255 255 / 0.05) 40%,
+    rgb(255 255 255 / 0.09) 50%,
+    rgb(255 255 255 / 0.05) 60%,
+    transparent 100%
   );
 }
 
 /* Premium card hover elevation */
 .card-hover {
   transition:
-    box-shadow 0.2s var(--ease-out-quart),
-    border-color 0.2s var(--ease-out-quart),
-    transform 0.2s var(--ease-out-quart);
+    box-shadow 0.2s var(--ease-smooth),
+    border-color 0.2s var(--ease-smooth),
+    transform 0.2s var(--ease-smooth);
 }
 .card-hover:hover {
   box-shadow: var(--shadow-raised);
   border-color: rgb(148 163 184 / 0.4);
+  transform: translateY(-2px);
 }
 
 /* Page transition wrapper (applied by keyed route containers) */
 .page-enter {
   animation: fade-up 0.25s var(--ease-out-quart) both;
+}
+
+/* Interactive base — non-button clickable elements */
+.interactive {
+  transition:
+    background-color var(--duration-fast) var(--ease-smooth),
+    border-color var(--duration-fast) var(--ease-smooth),
+    color var(--duration-fast) var(--ease-smooth),
+    box-shadow var(--duration-fast) var(--ease-smooth),
+    transform var(--duration-fast) var(--ease-smooth);
+}
+.interactive:active {
+  transform: scale(0.98);
+}
+
+/* Divider line */
+.divider {
+  border-top: 1px solid rgb(226 232 240);
+}
+.dark .divider {
+  border-top-color: rgb(30 41 59);
+}
+
+/* Explicit animation class aliases */
+.animate-fade-up         { animation: var(--animate-fade-up); }
+.animate-fade-in         { animation: var(--animate-fade-in); }
+.animate-scale-in        { animation: var(--animate-scale-in); }
+.animate-scale-out       { animation: var(--animate-scale-out); }
+.animate-slide-in-right  { animation: var(--animate-slide-in-right); }
+.animate-slide-in-left   { animation: var(--animate-slide-in-left); }
+.animate-slide-in-bottom { animation: var(--animate-slide-in-bottom); }
+.animate-slide-out-bottom { animation: var(--animate-slide-out-bottom); }
+.animate-dot-pulse       { animation: var(--animate-dot-pulse); }
+.animate-shake           { animation: shake 0.35s var(--ease-smooth) both; }
+
+.animate-wave {
+  animation: wave 1.2s ease-in-out infinite;
+  transform-origin: 70% 70%;
+  display: inline-block;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -296,13 +470,6 @@ html.dark {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-}
-
-@keyframes wave {
-  0%,
-  100% {
-    transform: rotate(0deg);
   }
   50% {
     transform: rotate(20deg);

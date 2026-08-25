@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
 import { Badge } from "@/components/ui/states";
 import { PageHeader } from "@/components/page-header";
 import { Toolbar } from "@/components/page-header";
-import { DataTable } from "@/components/ui/table";
+import { DataTable, MobileCard } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -206,6 +206,32 @@ export default function InventoryPage() {
             onSort={toggleSort}
             sortBy={query.sort_by as string}
             sortOrder={query.sort_order as "asc" | "desc"}
+            renderMobileCard={(p) => (
+              <MobileCard
+                title={p.name}
+                subtitle={`${p.sku} · ${p.category}`}
+                actions={
+                  can("inventory.update") && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setForm((f) => ({ ...f, product_id: p.id, type: "purchase" }));
+                        setFormErrors({});
+                        setAdjustOpen(true);
+                      }}
+                    >
+                      Restock
+                    </Button>
+                  )
+                }
+              >
+                <span className={`text-sm font-semibold tabular-nums ${p.stock_quantity <= p.low_stock_threshold ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-slate-100"}`}>
+                  {formatNumber(p.stock_quantity)} in stock
+                </span>
+                <Badge className={badgeClass(STOCK_STATUS_COLORS, p.stock_status)}>{p.stock_status.replace("_", " ")}</Badge>
+              </MobileCard>
+            )}
             renderRow={(p) => [
               <div key="name">
                 <p className="font-medium text-slate-900 dark:text-slate-100">{p.name}</p>
@@ -254,6 +280,24 @@ export default function InventoryPage() {
             loading={movements.loading}
             error={movements.error}
             onRetry={movements.refetch}
+            renderMobileCard={(m) => (
+              <MobileCard
+                title={m.product_name}
+                subtitle={formatDate(m.created_at)}
+              >
+                <Badge className={badgeClass(MOVEMENT_TYPE_COLORS, m.type)}>{m.type}</Badge>
+                <span
+                  className={`text-sm font-semibold tabular-nums ${m.quantity > 0 ? "text-emerald-600 dark:text-emerald-400" : m.quantity < 0 ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-slate-400"}`}
+                >
+                  {m.quantity > 0 ? `+${formatNumber(m.quantity)}` : formatNumber(m.quantity)}
+                </span>
+                {m.previous_stock !== null && m.new_stock !== null && (
+                  <span className="font-mono text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                    {formatNumber(m.previous_stock)} → {formatNumber(m.new_stock)}
+                  </span>
+                )}
+              </MobileCard>
+            )}
             renderRow={(m) => [
               <span key="date" className="text-xs text-slate-500 dark:text-slate-400">{formatDate(m.created_at)}</span>,
               <span key="product" className="font-medium text-slate-900 dark:text-slate-100">{m.product_name}</span>,

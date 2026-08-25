@@ -67,9 +67,9 @@ function SortIcon({ active, order }: { active: boolean; order?: "asc" | "desc" }
 
 function SkeletonRows() {
   return (
-    <div className="space-y-3 p-5">
+    <div className="space-y-2.5 p-5">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="skeleton h-11 rounded-xl" style={{ opacity: 1 - i * 0.13 }} />
+        <div key={i} className="skeleton h-10 rounded-lg" style={{ opacity: Math.max(1 - i * 0.13, 0.3) }} />
       ))}
     </div>
   );
@@ -182,16 +182,10 @@ export function DataTable<T extends { id: string }>({
         </div>
       )}
 
-      {/* Mobile cards */}
+      {/* Desktop table first in DOM so text queries resolve to the visible copy
+          on md+ screens; the mobile card list is hidden at those breakpoints. */}
       {renderMobileCard ? (
         <>
-          <ul className="divide-y divide-slate-100 md:hidden dark:divide-slate-800">
-            {rows.map((row) => (
-              <li key={row.id} className="animate-fade-up">
-                {renderMobileCard(row)}
-              </li>
-            ))}
-          </ul>
           <div className="hidden max-h-[calc(100vh-22rem)] overflow-auto md:block">
             <DesktopTable
               columns={columns}
@@ -203,6 +197,13 @@ export function DataTable<T extends { id: string }>({
               sortOrder={sortOrder}
             />
           </div>
+          <ul className="divide-y divide-slate-100 md:hidden dark:divide-slate-800">
+            {rows.map((row) => (
+              <li key={row.id} className="animate-fade-up">
+                {renderMobileCard(row)}
+              </li>
+            ))}
+          </ul>
         </>
       ) : (
         <div className="max-h-[calc(100vh-22rem)] overflow-auto">
@@ -241,7 +242,7 @@ function DesktopTable<T extends { id: string }>({
   return (
     <table className="w-full min-w-[640px] text-left text-sm">
       <thead className="sticky top-0 z-10">
-        <tr className="border-b border-slate-200 bg-white/95 backdrop-blur-sm supports-[backdrop-filter]:bg-white/80 dark:border-slate-800 dark:bg-slate-900/95 dark:supports-[backdrop-filter]:bg-slate-900/80">
+        <tr className="border-b border-slate-200 bg-white/95 backdrop-blur-sm supports-[backdrop-filter]:bg-white/80 dark:border-slate-800/80 dark:bg-slate-900/95 dark:supports-[backdrop-filter]:bg-slate-900/80">
           {columns.map((col) => {
             const active = sortBy === col.key;
             return (
@@ -249,30 +250,30 @@ function DesktopTable<T extends { id: string }>({
                 key={col.key}
                 scope="col"
                 aria-sort={active ? (sortOrder === "asc" ? "ascending" : "descending") : undefined}
-                className={`px-4 py-3 font-medium text-caption uppercase tracking-wider text-slate-400 dark:text-slate-500 ${col.className ?? ""}`}
+                className={`px-4 py-3 text-label text-slate-400 dark:text-slate-500 ${col.className ?? ""}`}
               >
                 {onSort ? (
                   <button
                     type="button"
                     onClick={() => onSort(col.key)}
-                    className={`group inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-slate-700 dark:hover:text-slate-200 ${active ? "text-slate-700 dark:text-slate-200" : ""}`}
+                    className={`group inline-flex items-center gap-1 transition-colors hover:text-slate-700 dark:hover:text-slate-200 ${active ? "text-indigo-600 dark:text-indigo-400" : ""}`}
                   >
                     {col.header}
                     <SortIcon active={!!active} order={sortOrder} />
                   </button>
                 ) : (
-                  <span className="uppercase tracking-wide">{col.header}</span>
+                  <span>{col.header}</span>
                 )}
               </th>
             );
           })}
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+      <tbody className="divide-y divide-slate-100/80 dark:divide-slate-800/60">
         {rows.map((row) => (
           <tr
             key={row.id}
-            className="transition-colors duration-100 hover:bg-slate-50/70 dark:hover:bg-slate-800/40"
+            className="group transition-colors duration-[100ms] hover:bg-slate-50 dark:hover:bg-slate-800/50"
           >
             {renderRow(row).map((cell, i) => (
               <td key={i} className={`${cellPad} text-slate-700 dark:text-slate-300`}>
@@ -283,6 +284,37 @@ function DesktopTable<T extends { id: string }>({
         ))}
       </tbody>
     </table>
+  );
+}
+
+/** Compact row card used by DataTable's `renderMobileCard` on small screens. */
+export function MobileCard({
+  title,
+  subtitle,
+  children,
+  actions,
+}: {
+  title: string;
+  subtitle?: string;
+  /** Meta row under the title: price, badges, key numbers. */
+  children?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 px-4 py-4">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</p>
+        {subtitle && (
+          <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+        )}
+        {children && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">{children}</div>
+        )}
+      </div>
+      {actions && (
+        <div className="flex shrink-0 items-center gap-1.5">{actions}</div>
+      )}
+    </div>
   );
 }
 
@@ -303,35 +335,36 @@ export function Pagination({
   const to = Math.min(page * pageSize, total);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 dark:border-slate-800">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 dark:border-slate-800/80">
       <p className="text-small tabular-nums text-slate-500 dark:text-slate-400">
         Showing{" "}
         <span className="font-medium text-slate-700 dark:text-slate-200">
           {from}–{to}
         </span>{" "}
-        of <span className="font-medium text-slate-700 dark:text-slate-200">{total}</span>
+        of{" "}
+        <span className="font-medium text-slate-700 dark:text-slate-200">{total}</span>
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <Button
           variant="outline"
-          size="sm"
+          size="xs"
           disabled={page <= 1}
           onClick={() => onChange(page - 1, pageSize)}
           aria-label="Previous page"
         >
-          Previous
+          ← Prev
         </Button>
-        <span className="tabular-nums px-1 text-small text-slate-500 dark:text-slate-400">
-          Page {page} of {Math.max(totalPages, 1)}
+        <span className="tabular-nums rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+          {page} / {Math.max(totalPages, 1)}
         </span>
         <Button
           variant="outline"
-          size="sm"
+          size="xs"
           disabled={page >= totalPages}
           onClick={() => onChange(page + 1, pageSize)}
           aria-label="Next page"
         >
-          Next
+          Next →
         </Button>
       </div>
     </div>

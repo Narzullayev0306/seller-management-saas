@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
 import { Badge } from "@/components/ui/states";
 import { PageHeader } from "@/components/page-header";
 import { Toolbar } from "@/components/page-header";
-import { DataTable } from "@/components/ui/table";
+import { DataTable, MobileCard } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -184,6 +184,32 @@ export default function SellersPage() {
           onSort={toggleSort}
           sortBy={query.sort_by as string}
           sortOrder={query.sort_order as "asc" | "desc"}
+          renderMobileCard={(s) => (
+            <MobileCard
+              title={fullName(s.first_name, s.last_name)}
+              subtitle={`${s.email} · ${s.commission_rate}% commission`}
+              actions={
+                <>
+                  {can("sellers.update") && (
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(s)}>
+                      Edit
+                    </Button>
+                  )}
+                  {can("sellers.delete") && s.status === "active" && (
+                    <Button variant="ghost" size="sm" loading={deleting === s.id} onClick={() => handleDeactivate(s)}>
+                      Deactivate
+                    </Button>
+                  )}
+                </>
+              }
+            >
+              <span className="text-sm font-semibold tabular-nums">{formatMoney(s.total_sales)}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {s.total_orders} order{s.total_orders === 1 ? "" : "s"}
+              </span>
+              <Badge className={badgeClass(SELLER_STATUS_COLORS, s.status)}>{s.status}</Badge>
+            </MobileCard>
+          )}
           renderRow={(s) => [
             <div key="name" className="flex items-center gap-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">

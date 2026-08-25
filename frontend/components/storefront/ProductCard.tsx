@@ -38,15 +38,15 @@ export function ProductCard({ product, onOpen, isCompared, onToggleCompare }: Pr
   return (
     <div
       onClick={() => onOpen(product)}
-      className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900"
+      className="group flex cursor-pointer flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white transition-[box-shadow,transform,border-color] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-1 hover:border-slate-300 hover:shadow-[var(--shadow-raised)] dark:border-slate-800/80 dark:bg-slate-900 dark:hover:border-slate-700"
     >
-      <div className="relative aspect-square overflow-hidden rounded-t-2xl bg-slate-100 dark:bg-slate-800">
+      <div className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-800">
         {product.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.image_url}
             alt={product.name}
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-slate-300 dark:text-slate-600">
@@ -56,7 +56,7 @@ export function ProductCard({ product, onOpen, isCompared, onToggleCompare }: Pr
 
         {badge && (
           <span
-            className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${badge.className}`}
+            className={`absolute left-3 top-3 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${badge.className}`}
           >
             {badge.label}
           </span>
@@ -146,7 +146,7 @@ export function ProductCard({ product, onOpen, isCompared, onToggleCompare }: Pr
                 addToCart(product);
               }}
               disabled={product.stock_status === "out_of_stock"}
-              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-600"
             >
               <BagIcon className="h-3.5 w-3.5" />
               Add to cart

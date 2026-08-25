@@ -215,22 +215,24 @@ function NavLink({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       title={collapsed ? item.label : undefined}
-      className={`group relative flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150 ease-out active:scale-[0.98] ${
+      className={`group relative flex items-center gap-3 rounded-lg text-sm font-medium transition-[background-color,color,transform] duration-[130ms] ease-[cubic-bezier(0.4,0,0.2,1)] active:scale-[0.98] ${
         collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2"
       } ${
         active
-          ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white"
+          ? "bg-indigo-50/80 text-indigo-700 font-semibold dark:bg-indigo-500/15 dark:text-indigo-300"
+          : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
       }`}
     >
-      {/* Active indicator */}
-      <span
-        aria-hidden
-        className={`absolute -left-2.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-indigo-600 transition-all duration-200 dark:bg-indigo-400 ${
-          active ? "opacity-100 scale-100" : "opacity-0 scale-50"
-        } ${collapsed ? "-left-1.5" : ""}`}
-      />
-      <span className={active ? "text-indigo-600 dark:text-indigo-300" : ""}>
+      {/* Active subtle left pill indicator */}
+      {active && (
+        <span
+          aria-hidden
+          className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-indigo-600 transition-all duration-200 dark:bg-indigo-400 ${
+            collapsed ? "left-0.5 h-4 w-0.5" : ""
+          }`}
+        />
+      )}
+      <span className={active ? "text-indigo-600 dark:text-indigo-300" : "text-slate-400 transition-colors group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300"}>
         <Icon d={item.icon} />
       </span>
       {!collapsed && <span className="truncate">{item.label}</span>}
@@ -248,7 +250,7 @@ function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: 
         return (
           <div key={group.label}>
             {!collapsed && (
-              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-600">
+              <p className="mb-1 px-3 text-label text-slate-400 dark:text-slate-600">
                 {group.label}
               </p>
             )}
@@ -277,24 +279,24 @@ function Sidebar({
   const { user } = useAuth();
   return (
     <div
-      className={`flex h-full flex-col border-r border-slate-200 bg-white transition-[width] duration-200 ease-out dark:border-slate-800 dark:bg-slate-900 ${
+      className={`flex h-full flex-col border-r border-slate-200/80 bg-white transition-[width] duration-200 ease-out dark:border-slate-800/80 dark:bg-slate-900 ${
         collapsed ? "w-[68px]" : "w-64"
       }`}
     >
       <div className={`flex items-center gap-2.5 py-4 ${collapsed ? "justify-center px-2" : "px-5"}`}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-600 to-sky-400 text-sm font-bold text-white shadow-md shadow-indigo-500/25">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-600 to-sky-400 text-sm font-bold text-white shadow-sm shadow-indigo-500/25">
           S
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">Seller Manager</p>
+            <p className="truncate text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Seller Manager</p>
             <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user?.organization_name ?? "Workspace"}</p>
           </div>
         )}
       </div>
       {!collapsed && <OrgSwitcher />}
       <NavLinks collapsed={collapsed} onNavigate={onNavigate} />
-      <div className={`border-t border-slate-200 dark:border-slate-800 ${collapsed ? "px-2 py-3" : "px-5 py-3"}`}>
+      <div className={`border-t border-slate-100 dark:border-slate-800/80 ${collapsed ? "px-2 py-3" : "px-5 py-3"}`}>
         {collapsed ? (
           <div className="flex flex-col items-center gap-2">
             <span
@@ -401,22 +403,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {drawerOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div
-            className="absolute inset-0 animate-in fade-in duration-150 bg-slate-900/50 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in"
             onClick={() => setDrawerOpen(false)}
             aria-hidden
           />
-          <div className="absolute inset-y-0 left-0 animate-in slide-in-from-left duration-200">
+          <div className="absolute inset-y-0 left-0 animate-slide-in-left">
             <Sidebar collapsed={false} onNavigate={() => setDrawerOpen(false)} />
           </div>
         </div>
       )}
 
       <div className={`transition-[padding] duration-200 ease-out ${collapsed ? "lg:pl-[68px]" : "lg:pl-64"}`}>
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/85 px-4 py-3 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/85 lg:px-8">
+        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-200/80 bg-white/90 px-4 py-2.5 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/90 lg:px-8">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setDrawerOpen(true)}
-              className="rounded-xl p-2 text-slate-600 hover:bg-slate-100 lg:hidden dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 active:scale-95 lg:hidden dark:text-slate-300 dark:hover:bg-slate-800"
               aria-label="Open menu"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -425,21 +427,21 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </button>
             <button
               onClick={() => setSearchOpen(true)}
-              className="hidden w-64 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400 transition hover:border-slate-300 sm:flex dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500 dark:hover:border-slate-600"
+              className="hidden w-64 items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-1.5 text-sm text-slate-400 transition hover:border-slate-300 hover:bg-slate-100/50 sm:flex dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-500 dark:hover:border-slate-700"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
               Search…
-              <kbd className="ml-auto rounded-md border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-400 dark:border-slate-600 dark:bg-slate-900">⌘K</kbd>
+              <kbd className="ml-auto rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-400 dark:border-slate-700 dark:bg-slate-900">⌘K</kbd>
             </button>
           </div>
           <div className="flex items-center gap-1.5">
             <Link
               href="/storefront"
-              className="hidden items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-600 hover:text-white active:scale-[0.98] md:flex dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-600 dark:hover:text-white"
+              className="hidden items-center gap-1.5 rounded-lg bg-indigo-50/80 px-3 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-600 hover:text-white active:scale-[0.98] md:flex dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-600 dark:hover:text-white"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M2.5 7h19l-2 12H4.5l-2-12zM6 7a6 6 0 0 1 12 0" />
               </svg>
               Storefront
