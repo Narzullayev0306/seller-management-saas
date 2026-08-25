@@ -471,13 +471,4 @@ html.dark {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  50% {
-    transform: rotate(20deg);
-  }
-}
-
-.animate-wave {
-  animation: wave 1.2s ease-in-out infinite;
-  transform-origin: 70% 70%;
-  display: inline-block;
 }
