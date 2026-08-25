@@ -96,6 +96,44 @@ export default function Page() {
         </div>
       </div>
 
+      {/* Quick Actions Shortcuts */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Link
+          href="/dashboard/products"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200/80 bg-white/80 px-3.5 py-2 text-xs font-medium text-slate-700 shadow-xs backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-white hover:text-indigo-600 dark:border-white/[0.08] dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900 dark:hover:text-indigo-400"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-indigo-500/10 text-xs font-bold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+            +
+          </span>
+          New Product
+        </Link>
+        <Link
+          href="/dashboard/orders"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200/80 bg-white/80 px-3.5 py-2 text-xs font-medium text-slate-700 shadow-xs backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-white hover:text-indigo-600 dark:border-white/[0.08] dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900 dark:hover:text-indigo-400"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+            📦
+          </span>
+          Manage Orders
+        </Link>
+        <Link
+          href="/dashboard/sellers"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200/80 bg-white/80 px-3.5 py-2 text-xs font-medium text-slate-700 shadow-xs backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-white hover:text-indigo-600 dark:border-white/[0.08] dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900 dark:hover:text-indigo-400"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-purple-500/10 text-xs font-bold text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
+            👥
+          </span>
+          Seller Network
+        </Link>
+        <Link
+          href="/storefront"
+          className="inline-flex items-center gap-2 rounded-lg border border-indigo-200/80 bg-indigo-50/70 px-3.5 py-2 text-xs font-semibold text-indigo-700 shadow-xs backdrop-blur-md transition-all duration-150 hover:-translate-y-0.5 hover:bg-indigo-100/70 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950/70"
+        >
+          <span className="flex h-2 w-2 rounded-full bg-indigo-600 animate-pulse dark:bg-indigo-400" />
+          Live Storefront →
+        </Link>
+      </div>
+
       {loading && (
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -136,6 +174,45 @@ export default function Page() {
   );
 }
 
+const KPI_THEMES: Record<string, { bg: string; text: string; stroke: string; gradient: string }> = {
+  Revenue: {
+    bg: "bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-500/20",
+    text: "text-emerald-600 dark:text-emerald-400",
+    stroke: "#10b981",
+    gradient: "emerald",
+  },
+  Orders: {
+    bg: "bg-indigo-500/10 dark:bg-indigo-500/20 border-indigo-500/20",
+    text: "text-indigo-600 dark:text-indigo-400",
+    stroke: "#6366f1",
+    gradient: "indigo",
+  },
+  "Avg order value": {
+    bg: "bg-sky-500/10 dark:bg-sky-500/20 border-sky-500/20",
+    text: "text-sky-600 dark:text-sky-400",
+    stroke: "#0ea5e9",
+    gradient: "sky",
+  },
+  Customers: {
+    bg: "bg-purple-500/10 dark:bg-purple-500/20 border-purple-500/20",
+    text: "text-purple-600 dark:text-purple-400",
+    stroke: "#a855f7",
+    gradient: "purple",
+  },
+  "Active sellers": {
+    bg: "bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/20",
+    text: "text-amber-600 dark:text-amber-400",
+    stroke: "#f59e0b",
+    gradient: "amber",
+  },
+  "Commission earned": {
+    bg: "bg-violet-500/10 dark:bg-violet-500/20 border-violet-500/20",
+    text: "text-violet-600 dark:text-violet-400",
+    stroke: "#8b5cf6",
+    gradient: "violet",
+  },
+};
+
 function StatCards({ summary, points }: { summary: DashboardData["summary"]; points: DashboardData["revenue_over_time"] }) {
   const values = useMemo<number[]>(() => {
     if (!points.length) return [Number(summary.revenue)];
@@ -166,7 +243,7 @@ function StatCards({ summary, points }: { summary: DashboardData["summary"]; poi
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {stats.map((s, i) => (
         <StatCard key={s.label} {...s} trend={i === 0 ? trend : null} />
       ))}
@@ -191,6 +268,8 @@ function StatCard({
 }) {
   const animated = useCountUp(countTo ?? null);
   const display = countTo !== undefined && format ? format(animated) : value;
+  const theme = KPI_THEMES[label] ?? KPI_THEMES.Revenue;
+
   const path = useMemo(() => {
     if (!spark || spark.length < 2) return null;
     const w = 96;
@@ -213,42 +292,40 @@ function StatCard({
   }, [spark, label]);
 
   return (
-    <Card>
-      <CardBody className="px-4 py-4">
-        <div className="flex items-center justify-between">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-              <path d={ICONS[label] ?? ICONS.Revenue} />
-            </svg>
-          </span>
-          {trend !== null && trend !== undefined && (
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                trend >= 0
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"
-              }`}
-            >
-              {trend >= 0 ? "▲" : "▼"} {Math.abs(trend)}%
-            </span>
-          )}
-        </div>
-        <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
-        <p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">{display}</p>
-        {path && (
-          <svg className="mt-2 h-8 w-full" viewBox="0 0 96 32" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id={path.id} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#818cf8" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <path d={`${path.d} L 96,32 L 0,32 Z`} fill={`url(#${path.id})`} />
-            <path d={path.d} fill="none" stroke="#6366f1" strokeWidth={1.6} strokeLinecap="round" />
+    <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white/90 p-4 shadow-xs backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-white/[0.08] dark:bg-slate-900/80 dark:hover:border-indigo-500/40">
+      <div className="flex items-center justify-between">
+        <span className={`flex h-8 w-8 items-center justify-center rounded-lg border ${theme.bg} ${theme.text}`}>
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d={ICONS[label] ?? ICONS.Revenue} />
           </svg>
+        </span>
+        {trend !== null && trend !== undefined && (
+          <span
+            className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              trend >= 0
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                : "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+            }`}
+          >
+            {trend >= 0 ? "↑" : "↓"} {Math.abs(trend)}%
+          </span>
         )}
-      </CardBody>
-    </Card>
+      </div>
+      <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-0.5 text-xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white">{display}</p>
+      {path && (
+        <svg className="mt-2 h-7 w-full" viewBox="0 0 96 32" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id={path.id} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={theme.stroke} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={theme.stroke} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <path d={`${path.d} L 96,32 L 0,32 Z`} fill={`url(#${path.id})`} />
+          <path d={path.d} fill="none" stroke={theme.stroke} strokeWidth={1.8} strokeLinecap="round" />
+        </svg>
+      )}
+    </div>
   );
 }
 
@@ -323,23 +400,44 @@ function RevenueChart({ points }: { points: DashboardData["revenue_over_time"] }
 }
 
 function TopProducts({ items }: { items: DashboardData["top_products"] }) {
+  const maxVal = useMemo(() => Math.max(...items.map((i) => Number(i.value)), 1), [items]);
   return (
     <Card>
-      <CardHeader title="Top products" />
-      <CardBody>
+      <CardHeader title="Top products" subtitle="Ranked by gross sales" />
+      <CardBody className="px-3 py-2">
         {items.length === 0 ? (
-          <EmptyState title="No data" description="No products sold in this period." />
+          <div className="py-6">
+            <EmptyState title="No data" description="No products sold in this period." />
+          </div>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {items.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{item.name}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{item.orders} orders</p>
-                </div>
-                <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatMoney(item.value)}</span>
-              </li>
-            ))}
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800/80">
+            {items.map((item, idx) => {
+              const pct = Math.round((Number(item.value) / maxVal) * 100);
+              return (
+                <li key={item.id} className="group flex flex-col gap-1.5 px-3 py-3 transition hover:bg-slate-50/70 dark:hover:bg-slate-800/40 rounded-lg">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                        idx === 0 ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300" :
+                        idx === 1 ? "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300" :
+                        idx === 2 ? "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300" :
+                        "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                      }`}>
+                        {idx + 1}
+                      </span>
+                      <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{item.name}</p>
+                    </div>
+                    <span className="shrink-0 text-xs font-bold text-slate-900 dark:text-slate-100">{formatMoney(item.value)}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-sky-400 transition-all duration-500" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="shrink-0 text-[10px] text-slate-400">{item.orders} orders</span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardBody>
@@ -348,28 +446,39 @@ function TopProducts({ items }: { items: DashboardData["top_products"] }) {
 }
 
 function TopSellers({ items }: { items: DashboardData["top_sellers"] }) {
+  const maxVal = useMemo(() => Math.max(...items.map((i) => Number(i.value)), 1), [items]);
   return (
     <Card>
-      <CardHeader title="Top sellers" />
-      <CardBody>
+      <CardHeader title="Top sellers" subtitle="Best performing partners" />
+      <CardBody className="px-3 py-2">
         {items.length === 0 ? (
-          <EmptyState title="No data" description="No sellers with sales in this period." />
+          <div className="py-6">
+            <EmptyState title="No data" description="No sellers with sales in this period." />
+          </div>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {items.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 py-2.5">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                    {item.name.slice(0, 2).toUpperCase()}
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800/80">
+            {items.map((item, idx) => {
+              const pct = Math.round((Number(item.value) / maxVal) * 100);
+              return (
+                <li key={item.id} className="group flex flex-col gap-1.5 px-3 py-3 transition hover:bg-slate-50/70 dark:hover:bg-slate-800/40 rounded-lg">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-tr from-purple-500 to-indigo-600 text-[11px] font-bold text-white shadow-xs">
+                        {item.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{item.name}</p>
+                    </div>
+                    <span className="shrink-0 text-xs font-bold text-slate-900 dark:text-slate-100">{formatMoney(item.value)}</span>
                   </div>
-                  <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{item.name}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">{item.orders} orders</span>
-                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatMoney(item.value)}</span>
-                </div>
-              </li>
-            ))}
+                  <div className="flex items-center gap-3">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-400 transition-all duration-500" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="shrink-0 text-[10px] text-slate-400">{item.orders} orders</span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardBody>
@@ -392,29 +501,28 @@ function RevenueComparisonCard({ comparison }: { comparison: DashboardData["reve
   return (
     <Card>
       <CardHeader title="Revenue comparison" subtitle="This period vs previous period" />
-      <CardBody className="flex h-full flex-col justify-center">
-        <div className="flex items-end gap-6">
+      <CardBody className="flex h-full flex-col justify-center p-6">
+        <div className="flex items-end justify-between">
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">This period</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{formatMoney(comparison.current)}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">This period</p>
+            <p className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{formatMoney(comparison.current)}</p>
           </div>
-          <div className="pb-1">
-            <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Previous</p>
-            <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">{formatMoney(comparison.previous)}</p>
+          <div className="text-right">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Previous</p>
+            <p className="mt-1 text-base font-semibold text-slate-500 dark:text-slate-400">{formatMoney(comparison.previous)}</p>
           </div>
         </div>
-        <span
-          className={`mt-4 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-            up
-              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-              : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
-          }`}
-        >
-          {up ? "▲" : "▼"} {Math.abs(change)}% {up ? "increase" : "decrease"}
-        </span>
-        {Number(comparison.previous) === 0 && Number(comparison.current) === 0 && (
-          <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">No revenue in either period yet.</p>
-        )}
+        <div className="mt-4">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
+              up
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/20"
+                : "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-500/20"
+            }`}
+          >
+            {up ? "↑" : "↓"} {Math.abs(change)}% {up ? "growth" : "drop"}
+          </span>
+        </div>
       </CardBody>
     </Card>
   );
@@ -425,29 +533,37 @@ function RecentOrders({ items }: { items: DashboardData["recent_orders"] }) {
     <Card>
       <CardHeader
         title="Recent orders"
+        subtitle="Latest transactions processed"
         actions={
-          <Link href="/dashboard/orders" className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
-            View all
+          <Link href="/dashboard/orders" className="text-xs font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-400">
+            View all →
           </Link>
         }
       />
-      <CardBody className="px-2 py-1">
+      <CardBody className="px-3 py-2">
         {items.length === 0 ? (
           <div className="px-3 py-8">
             <EmptyState title="No orders" description="Orders will appear here as they are created." />
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800/80">
             {items.map((o) => (
-              <li key={o.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="font-mono text-xs font-semibold text-indigo-600 dark:text-indigo-400">{o.order_number}</p>
-                  <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{o.customer_name}</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">{formatDate(o.created_at)}</p>
+              <li key={o.id} className="group flex items-center justify-between gap-3 px-3 py-3 transition hover:bg-slate-50/70 dark:hover:bg-slate-800/40 rounded-lg">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    {o.customer_name ? o.customer_name.slice(0, 1).toUpperCase() : "C"}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">{o.order_number}</p>
+                      <p className="truncate text-xs font-medium text-slate-900 dark:text-slate-100">{o.customer_name}</p>
+                    </div>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">{formatDate(o.created_at)}</p>
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <Badge className={badgeClass(ORDER_STATUS_COLORS, o.status)}>{o.status}</Badge>
-                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatMoney(o.total)}</span>
+                  <span className="text-xs font-bold tabular-nums text-slate-900 dark:text-slate-100">{formatMoney(o.total)}</span>
                 </div>
               </li>
             ))}
@@ -462,35 +578,35 @@ function LowStockCard({ items }: { items: DashboardData["low_stock_products"] })
   return (
     <Card>
       <CardHeader
-        title="Low stock"
-        subtitle="Products at or below their threshold"
+        title="Low stock alerts"
+        subtitle="SKUs requiring immediate replenishment"
         actions={
-          <Link href="/dashboard/inventory" className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
-            View inventory
+          <Link href="/dashboard/inventory" className="text-xs font-semibold text-indigo-600 transition hover:text-indigo-500 dark:text-indigo-400">
+            View inventory →
           </Link>
         }
       />
-      <CardBody className="px-2 py-1">
+      <CardBody className="px-3 py-2">
         {items.length === 0 ? (
           <div className="px-3 py-8">
-            <EmptyState title="All stocked up" description="No products are running low." />
+            <EmptyState title="All stocked up" description="No products are running low on stock." />
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800/80">
             {items.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+              <li key={p.id} className="group flex items-center justify-between gap-3 px-3 py-3 transition hover:bg-slate-50/70 dark:hover:bg-slate-800/40 rounded-lg">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{p.name}</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">{p.sku}</p>
+                  <p className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">{p.name}</p>
+                  <p className="font-mono text-[11px] text-slate-400 dark:text-slate-500">SKU: {p.sku}</p>
                 </div>
                 <Badge
                   className={
                     p.stock_quantity === 0
-                      ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800"
-                      : "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                      ? "bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900/50"
+                      : "bg-amber-50 text-amber-800 border-amber-200/80 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-900/50"
                   }
                 >
-                  {p.stock_quantity} left
+                  {p.stock_quantity === 0 ? "Out of stock" : `${p.stock_quantity} left`}
                 </Badge>
               </li>
             ))}
