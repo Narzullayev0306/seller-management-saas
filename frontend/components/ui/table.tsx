@@ -242,7 +242,7 @@ function DesktopTable<T extends { id: string }>({
   return (
     <table className="w-full min-w-[640px] text-left text-sm">
       <thead className="sticky top-0 z-10">
-        <tr className="border-b border-slate-200 bg-white/95 backdrop-blur-sm supports-[backdrop-filter]:bg-white/80 dark:border-slate-800/80 dark:bg-slate-900/95 dark:supports-[backdrop-filter]:bg-slate-900/80">
+        <tr className="border-b border-slate-200/80 bg-slate-50/90 backdrop-blur-md dark:border-white/[0.06] dark:bg-slate-900/80">
           {columns.map((col) => {
             const active = sortBy === col.key;
             return (
@@ -250,13 +250,13 @@ function DesktopTable<T extends { id: string }>({
                 key={col.key}
                 scope="col"
                 aria-sort={active ? (sortOrder === "asc" ? "ascending" : "descending") : undefined}
-                className={`px-4 py-3 text-label text-slate-400 dark:text-slate-500 ${col.className ?? ""}`}
+                className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ${col.className ?? ""}`}
               >
                 {onSort ? (
                   <button
                     type="button"
                     onClick={() => onSort(col.key)}
-                    className={`group inline-flex items-center gap-1 transition-colors hover:text-slate-700 dark:hover:text-slate-200 ${active ? "text-indigo-600 dark:text-indigo-400" : ""}`}
+                    className={`group inline-flex items-center gap-1.5 transition-colors hover:text-slate-800 dark:hover:text-slate-100 ${active ? "text-indigo-600 dark:text-indigo-400" : ""}`}
                   >
                     {col.header}
                     <SortIcon active={!!active} order={sortOrder} />
@@ -273,7 +273,7 @@ function DesktopTable<T extends { id: string }>({
         {rows.map((row) => (
           <tr
             key={row.id}
-            className="group transition-colors duration-[100ms] hover:bg-slate-50 dark:hover:bg-slate-800/50"
+            className="group transition-colors duration-[80ms] hover:bg-indigo-50/30 dark:hover:bg-slate-800/60"
           >
             {renderRow(row).map((cell, i) => (
               <td key={i} className={`${cellPad} text-slate-700 dark:text-slate-300`}>

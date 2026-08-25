@@ -12,7 +12,7 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{title}</h1>
         {description && <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{description}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
@@ -32,7 +32,7 @@ export function Toolbar({
   filters?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+    <div className="flex flex-wrap items-center gap-2 border-b border-slate-100/80 px-5 py-3 dark:border-white/[0.06]">
       <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
         <svg
           className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -47,7 +47,7 @@ export function Toolbar({
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           placeholder={placeholder}
-          className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+          className="w-full rounded-xl border border-slate-200/80 bg-white/80 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 backdrop-blur-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-white/[0.08] dark:bg-slate-800/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-500"
         />
       </div>
       {filters && <div className="flex flex-wrap items-center gap-2">{filters}</div>}
@@ -56,5 +56,5 @@ export function Toolbar({
 }
 
 export function PageFooter({ children }: { children: ReactNode }) {
-  return <div className="border-t border-slate-100 dark:border-slate-800">{children}</div>;
+  return <div className="border-t border-slate-100/80 dark:border-white/[0.06]">{children}</div>;
 }

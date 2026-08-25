@@ -197,11 +197,11 @@ export default function ProductsPage() {
   );
 
   const columns = [
-    { key: "name", header: "Product" },
+    { key: "name", header: "Product", sortable: true },
     { key: "sku", header: "SKU" },
     { key: "category", header: "Category" },
-    { key: "price", header: "Price" },
-    { key: "stock_quantity", header: "Stock" },
+    { key: "price", header: "Price", sortable: true },
+    { key: "stock_quantity", header: "Stock", sortable: true },
     { key: "stock_status", header: "Status" },
     { key: "actions", header: "" },
   ];
@@ -284,17 +284,36 @@ export default function ProductsPage() {
             </MobileCard>
           )}
           renderRow={(p) => [
-            <div key="name">
-              <p className="font-medium text-slate-900 dark:text-slate-100">{p.name}</p>
-              {p.description && <p className="mt-0.5 line-clamp-1 text-xs text-slate-400 dark:text-slate-500">{p.description}</p>}
+            <div key="name" className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700">
+                {p.image_url ? (
+                  <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-sm font-bold text-slate-500 dark:text-slate-400">
+                    {p.name.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{p.name}</p>
+                {p.description && <p className="mt-0.5 line-clamp-1 text-xs text-slate-400 dark:text-slate-500">{p.description}</p>}
+              </div>
             </div>,
-            <span key="sku" className="font-mono text-xs text-slate-500 dark:text-slate-400">{p.sku}</span>,
-            <Badge key="cat" className="bg-slate-100 text-slate-600 border-slate-200">{p.category}</Badge>,
-            <span key="price" className="font-medium">{formatMoney(p.price)}</span>,
-            <span key="stock" className={p.stock_quantity <= p.low_stock_threshold ? "font-medium text-amber-600" : ""}>
-              {p.stock_quantity}
-            </span>,
-            <Badge key="status" className={badgeClass(STOCK_STATUS_COLORS, p.stock_status)}>{p.stock_status.replace("_", " ")}</Badge>,
+            <span key="sku" className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{p.sku}</span>,
+            <span key="cat" className="rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">{p.category}</span>,
+            <span key="price" className="text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">{formatMoney(p.price)}</span>,
+            <div key="stock" className="flex items-center gap-2">
+              <span className={`text-xs font-bold tabular-nums ${p.stock_quantity <= p.low_stock_threshold ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-slate-100"}`}>
+                {p.stock_quantity}
+              </span>
+              <div className="h-1 w-14 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <div
+                  className={`h-full rounded-full transition-all ${p.stock_quantity === 0 ? "bg-rose-500" : p.stock_quantity <= p.low_stock_threshold ? "bg-amber-400" : "bg-emerald-500"}`}
+                  style={{ width: `${Math.min(100, (p.stock_quantity / Math.max(p.low_stock_threshold * 4, 1)) * 100)}%` }}
+                />
+              </div>
+            </div>,
+            <Badge key="status" className={badgeClass(STOCK_STATUS_COLORS, p.stock_status)}>{p.stock_status.replace(/_/g, " ")}</Badge>,
             <div key="actions" className="flex justify-end gap-1">
               {can("products.update") && (
                 <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>

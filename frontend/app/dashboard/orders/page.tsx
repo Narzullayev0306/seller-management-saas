@@ -329,22 +329,34 @@ export default function OrdersPage() {
             </MobileCard>
           )}
           renderRow={(o) => [
-            <div key="num">
-              <button type="button" className="font-mono text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400" onClick={() => openDetail(o)}>
-                {o.order_number}
-              </button>
-              <p className="text-xs text-slate-400 dark:text-slate-500">{o.items.reduce((acc, i) => acc + i.quantity, 0)} items</p>
+            <div key="num" className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-950/60">
+                <svg className="h-4 w-4 text-indigo-500 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                </svg>
+              </div>
+              <div>
+                <button type="button" className="font-mono text-xs font-bold text-indigo-600 hover:underline dark:text-indigo-400" onClick={() => openDetail(o)}>
+                  {o.order_number}
+                </button>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">{o.items.reduce((acc, i) => acc + i.quantity, 0)} items</p>
+              </div>
             </div>,
-            <div key="cust">
-              <p className="font-medium text-slate-900 dark:text-slate-100">{o.customer_name}</p>
-              {o.seller_name && <p className="text-xs text-slate-400 dark:text-slate-500">Seller: {o.seller_name}</p>}
+            <div key="cust" className="flex items-center gap-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                {o.customer_name ? o.customer_name.slice(0, 1).toUpperCase() : "?"}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">{o.customer_name}</p>
+                {o.seller_name && <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">via {o.seller_name}</p>}
+              </div>
             </div>,
-            <span key="total" className="font-medium text-slate-900 dark:text-slate-100">{formatMoney(o.total)}</span>,
+            <span key="total" className="text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">{formatMoney(o.total)}</span>,
             <Badge key="status" className={badgeClass(ORDER_STATUS_COLORS, o.status)}>{o.status}</Badge>,
             <Badge key="payment" className={badgeClass(PAYMENT_STATUS_COLORS, o.payment_status)}>
-              {o.payment_status.replace("_", " ")}
+              {o.payment_status.replace(/_/g, " ")}
             </Badge>,
-            <span key="created" className="text-xs text-slate-500 dark:text-slate-400">{formatDate(o.created_at)}</span>,
+            <span key="created" className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400">{formatDate(o.created_at)}</span>,
             <div key="actions" className="flex justify-end gap-1">
               <Button variant="ghost" size="sm" onClick={() => openDetail(o)}>
                 View
